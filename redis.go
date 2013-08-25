@@ -11,19 +11,27 @@ type Redis struct {
 	address         string
 	database        int
 	password        string
-	socket_timeout  time.Duration
 	connect_timeout time.Duration
 	conn            net.Conn
-	reader          bufio.Reader
+	reader          *bufio.Reader
 }
 
 func (r *Redis) Connect() error {
-	c, err := net.DialTimeout(r.network, r.address, r.connect_timeout)
+	if r.network == "" {
+		r.network = "tcp"
+	}
+	if r.address == "" {
+		r.address = ":6379"
+	}
+	var err error
+	if r.connect_timeout > 0 {
+		r.conn, err = net.DialTimeout(r.network, r.address, r.connect_timeout)
+	} else {
+		r.conn, err = net.Dial(r.network, r.address)
+	}
 	if err != nil {
 		return err
 	}
-	r.conn = c
-	r.conn.SetDeadline(r.socket_timeout)
 	r.reader = bufio.NewReader(r.conn)
 	if r.password != "" {
 		err := r.Auth(r.password)

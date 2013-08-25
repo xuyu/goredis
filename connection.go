@@ -39,7 +39,10 @@ func (r *Redis) Echo(message string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return m, nil
+	if m == nil {
+		return "", errors.New("Nil Bulk Reply")
+	}
+	return *m, nil
 }
 
 func (r *Redis) Ping() (string, error) {
@@ -53,7 +56,13 @@ func (r *Redis) Ping() (string, error) {
 	return status, nil
 }
 
-func (r *Redis) Quit() {
-	r.send_command("QUIT")
+func (r *Redis) Quit() error {
+	if err := r.send_command("QUIT"); err != nil {
+		return err
+	}
+	if _, err := r.status_reply(); err != nil {
+		return err
+	}
 	r.conn.Close()
+	return nil
 }

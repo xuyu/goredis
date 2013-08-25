@@ -1,66 +1,104 @@
 package redis
 
 import (
-	"bufio"
 	"errors"
 	"strconv"
 )
 
-func read_reply(r bufio.Reader) (*Reply, error) {
-	data, err := r.ReadBytes(LF)
+func (r *Redis) read_head() ([]byte, []byte, error) {
+	data, err := r.reader.ReadBytes(LF)
+	if err != nil {
+		return []byte{}, []byte{}, err
+	}
+	return data, data[1 : len(data)-2], nil
+}
+
+func (r *Redis) status_reply() (string, error) {
+	data, head, err := r.read_head()
+	if err != nil {
+		return "", err
+	}
+	if data[0] == PLUS {
+		return string(head), nil
+	}
+	return "", errors.New(string(head))
+}
+
+func (r *Redis) bulk_reply() (*string, error) {
+	data, head, err := r.read_head()
 	if err != nil {
 		return nil, err
 	}
-	head := data[1 : len(data)-2]
-	switch data[0] {
-	case MINUS:
-		return parse_error(r, head)
-	case PLUS:
-		return parse_status(r, head)
-	case COLON:
-		return parse_integer(r, head)
-	case DOLLAR:
-		return parse_bulk(r, head)
-	case STAR:
-		return parse_multibulk(r, head)
+	if data[0] == DOLLAR {
+		size, err := strconv.Atoi(string(head))
+		if err != nil {
+			return nil, err
+		}
+		if size == -1 {
+			return nil, nil
+		}
+		buf := make([]byte, size+2)
+		if _, err := r.reader.Read(buf); err != nil {
+			return nil, err
+		}
+		bulk := string(buf[:size])
+		return &bulk, nil
 	}
-	return nil, errors.New("Unknown Reply: " + string(data))
+	if data[0] == COLON {
+		bulk := string(head)
+		return &bulk, nil
+	}
+	return nil, errors.New(string(head))
 }
 
-func parse_error(r bufio.Reader, head []byte) (*Reply, error) {
-	return &Reply{Head: ERROR_REPLY, Error: errors.New(string(head))}, nil
+func (r *Redis) integer_reply() (int, error) {
+	data, head, err := r.read_head()
+	if err != nil {
+		return -1, err
+	}
+	if data[0] == COLON {
+		n, err := strconv.Atoi(string(head))
+		if err != nil {
+			return -1, err
+		}
+		return n, nil
+	}
+	return -1, errors.New(string(head))
 }
 
-func parse_status(r bufio.Reader, head []byte) (*Reply, error) {
-	return &Reply{Head: STATUS_REPLY, Content: head}, nil
+func (r *Redis) bool_reply() (bool, error) {
+	i, err := r.integer_reply()
+	if err != nil {
+		return false, err
+	}
+	if i == 0 {
+		return false, nil
+	}
+	return true, nil
 }
 
-func parse_integer(r bufio.Reader, head []byte) (*Reply, error) {
-	_, err := strconv.Atoi(string(head))
+func (r *Redis) multibulk_reply() (*[]*string, error) {
+	data, head, err := r.read_head()
 	if err != nil {
 		return nil, err
 	}
-	return &Reply{Head: INTEGER_REPLY, Content: head}, nil
-}
-
-func parse_bulk(r bufio.Reader, head []byte) (*Reply, error) {
-	reply := &Reply{Head: BULK_REPLY, Null: false}
-	size, err := strconv.Atoi(string(head))
-	if err != nil {
-		return nil, err
+	if data[0] != STAR {
+		return nil, errors.New(string(head))
 	}
-	if size == -1 {
-		reply.Null = true
-		return reply, nil
+	n, er := strconv.Atoi(string(head))
+	if er != nil {
+		return nil, er
 	}
-	buf := make([]byte, size+2)
-	if _, err := r.Read(buf); err != nil {
-		return nil, err
+	if n == -1 {
+		return nil, nil
 	}
-	reply.Content = buf[:len(buf)-2]
-	return reply, nil
-}
-
-func parse_multibulk(r bufio.Reader, head []byte) (*Reply, error) {
-	return nil, nil
+	result := make([]*string, n)
+	for i := 0; i < n; i++ {
+		bulk, err := r.bulk_reply()
+		if err != nil {
+			return nil, err
+		}
+		result[i] = bulk
+	}
+	return &result, nil
 }
