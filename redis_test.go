@@ -5,7 +5,7 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	r := new(Redis)
+	r := &Redis{}
 	err := r.Connect()
 	if err != nil {
 		t.Fatal(err.Error())

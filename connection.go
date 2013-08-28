@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"errors"
 	"strconv"
 )
 
@@ -9,12 +8,8 @@ func (r *Redis) Auth(password string) error {
 	if err := r.send_command("AUTH", password); err != nil {
 		return err
 	}
-	status, err := r.status_reply()
-	if err != nil {
+	if err := r.ok_reply(); err != nil {
 		return err
-	}
-	if status != "OK" {
-		return errors.New(status)
 	}
 	r.password = password
 	return nil
@@ -40,7 +35,7 @@ func (r *Redis) Echo(message string) (string, error) {
 		return "", err
 	}
 	if m == nil {
-		return "", errors.New("Nil Bulk Reply")
+		return "", NilBulkError
 	}
 	return *m, nil
 }
@@ -60,7 +55,7 @@ func (r *Redis) Quit() error {
 	if err := r.send_command("QUIT"); err != nil {
 		return err
 	}
-	if _, err := r.status_reply(); err != nil {
+	if err := r.ok_reply(); err != nil {
 		return err
 	}
 	r.conn.Close()

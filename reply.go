@@ -5,6 +5,10 @@ import (
 	"strconv"
 )
 
+var (
+	NilBulkError = errors.New("Nil Bulk Reply")
+)
+
 func (r *Redis) read_head() ([]byte, []byte, error) {
 	data, err := r.reader.ReadBytes(LF)
 	if err != nil {
@@ -22,6 +26,17 @@ func (r *Redis) status_reply() (string, error) {
 		return string(head), nil
 	}
 	return "", errors.New(string(head))
+}
+
+func (r *Redis) ok_reply() error {
+	status, err := r.status_reply()
+	if err != nil {
+		return err
+	}
+	if status != "OK" {
+		return errors.New(status)
+	}
+	return nil
 }
 
 func (r *Redis) bulk_reply() (*string, error) {
