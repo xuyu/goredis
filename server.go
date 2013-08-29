@@ -80,3 +80,103 @@ func (r *Redis) ConfigResetStat() error {
 	}
 	return r.ok_reply()
 }
+
+func (r *Redis) ConfigRewrite() error {
+	if err := r.send_command("CONFIG", "REWRITE"); err != nil {
+		return err
+	}
+	return r.ok_reply()
+}
+
+func (r *Redis) ConfigSet(parameter, value string) error {
+	if err := r.send_command("CONFIG", "SET", parameter, value); err != nil {
+		return err
+	}
+	return r.ok_reply()
+}
+
+func (r *Redis) DBSize() (int, error) {
+	if err := r.send_command("DBSIZE"); err != nil {
+		return -1, err
+	}
+	return r.integer_reply()
+}
+
+func (r *Redis) FlushAll() error {
+	if err := r.send_command("FLUSHALL"); err != nil {
+		return err
+	}
+	if _, err := r.status_reply(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Redis) FlushDB() error {
+	if err := r.send_command("FLUSHDB"); err != nil {
+		return err
+	}
+	if _, err := r.status_reply(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Redis) Info(section string) (string, error) {
+	if err := r.send_command("INFO", section); err != nil {
+		return "", err
+	}
+	bulk, err := r.bulk_reply()
+	if err != nil {
+		return "", err
+	}
+	if bulk == nil {
+		return "", NilBulkError
+	}
+	return *bulk, nil
+}
+
+func (r *Redis) LastSave() (int, error) {
+	if err := r.send_command("LASTSAVE"); err != nil {
+		return -1, err
+	}
+	return r.integer_reply()
+}
+
+func (r *Redis) Save() error {
+	if err := r.send_command("SAVE"); err != nil {
+		return err
+	}
+	return r.ok_reply()
+}
+
+func (r *Redis) Shutdown(how string) error {
+	if err := r.send_command("SHUTDOWN", how); err != nil {
+		return err
+	}
+	if _, err := r.status_reply(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Redis) SlaveOf(host, port string) (string, error) {
+	if err := r.send_command("SLAVEOF", host, port); err != nil {
+		return "", err
+	}
+	return r.status_reply()
+}
+
+func (r *Redis) Time() (string, string, error) {
+	if err := r.send_command("TIME"); err != nil {
+		return "", "", err
+	}
+	res, err := r.multibulk_reply()
+	if err != nil {
+		return "", "", err
+	}
+	if res == nil {
+		return "", "", NilBulkError
+	}
+	return *(*res)[0], *(*res)[1], nil
+}
