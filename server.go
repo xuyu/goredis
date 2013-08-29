@@ -8,20 +8,14 @@ func (r *Redis) BgRewriteAOF() error {
 	if err := r.send_command("BGREWRITEAOF"); err != nil {
 		return err
 	}
-	if err := r.ok_reply(); err != nil {
-		return err
-	}
-	return nil
+	return r.ok_reply()
 }
 
 func (r *Redis) BgSave() error {
 	if err := r.send_command("BGSAVE"); err != nil {
 		return err
 	}
-	if err := r.ok_reply(); err != nil {
-		return err
-	}
-	return nil
+	return r.ok_reply()
 }
 
 func (r *Redis) ClientGetName() (*string, error) {
@@ -39,10 +33,7 @@ func (r *Redis) ClientKill(ip, port string) error {
 	if err := r.send_command("CLIENT", "KILL", ip+":"+port); err != nil {
 		return err
 	}
-	if err := r.ok_reply(); err != nil {
-		return err
-	}
-	return nil
+	return r.ok_reply()
 }
 
 func (r *Redis) ClientList() ([]map[string]string, error) {
@@ -73,10 +64,7 @@ func (r *Redis) ClientSetName(name string) error {
 	if err := r.send_command("CLIENT", "SETNAME", name); err != nil {
 		return err
 	}
-	if err := r.ok_reply(); err != nil {
-		return err
-	}
-	return nil
+	return r.ok_reply()
 }
 
 func (r *Redis) ConfigGet(pattern string) (*string, error) {
@@ -84,4 +72,11 @@ func (r *Redis) ConfigGet(pattern string) (*string, error) {
 		return nil, err
 	}
 	return r.bulk_reply()
+}
+
+func (r *Redis) ConfigResetStat() error {
+	if err := r.send_command("CONFIG", "RESETSTAT"); err != nil {
+		return err
+	}
+	return r.ok_reply()
 }
