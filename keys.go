@@ -94,7 +94,7 @@ func (r *Redis) Pexpireat(key string, timestamp int) (bool, error) {
 	return r.bool_reply()
 }
 
-func (r *Redis) Pttl(key string) (int, error) {
+func (r *Redis) PTTL(key string) (int, error) {
 	if err := r.send_command("PTTL", key); err != nil {
 		return -1, err
 	}
