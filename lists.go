@@ -15,14 +15,7 @@ func (r *Redis) BLPop(keys []string, timeout int) (*[]string, error) {
 	if err := r.send_command(args...); err != nil {
 		return nil, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return nil, err
-	}
-	if multibulk == nil {
-		return nil, nil
-	}
-	return &[]string{*(*multibulk)[0], *(*multibulk)[1]}, nil
+	return r.strarrayp_reply()
 }
 
 func (r *Redis) BRPop(keys []string, timeout int) (*[]string, error) {
@@ -34,14 +27,7 @@ func (r *Redis) BRPop(keys []string, timeout int) (*[]string, error) {
 	if err := r.send_command(args...); err != nil {
 		return nil, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return nil, err
-	}
-	if multibulk == nil {
-		return nil, nil
-	}
-	return &[]string{*(*multibulk)[0], *(*multibulk)[1]}, nil
+	return r.strarrayp_reply()
 }
 
 func (r *Redis) BRPopLPush(source, destination string, timeout int) (*string, error) {
@@ -105,18 +91,7 @@ func (r *Redis) LRange(key string, start, stop int) ([]string, error) {
 	if err := r.send_command("LRANGE", key, strconv.Itoa(start), strconv.Itoa(stop)); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) LRem(key string, count int, value string) (int, error) {

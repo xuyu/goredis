@@ -30,14 +30,7 @@ func (r *Redis) Echo(message string) (string, error) {
 	if err := r.send_command("ECHO", message); err != nil {
 		return "", err
 	}
-	m, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if m == nil {
-		return "", NilBulkError
-	}
-	return *m, nil
+	return r.string_reply()
 }
 
 func (r *Redis) Ping() (string, error) {

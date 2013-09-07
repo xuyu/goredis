@@ -126,14 +126,7 @@ func (r *Redis) Info(section string) (string, error) {
 	if err := r.send_command("INFO", section); err != nil {
 		return "", err
 	}
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
+	return r.string_reply()
 }
 
 func (r *Redis) LastSave() (int, error) {

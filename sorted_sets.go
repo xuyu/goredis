@@ -36,14 +36,7 @@ func (r *Redis) ZIncrBy(key string, score int, member string) (string, error) {
 	if err := r.send_command("ZINCRBY", key, strconv.Itoa(score), member); err != nil {
 		return "", err
 	}
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
+	return r.string_reply()
 }
 
 func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, error) {
@@ -54,16 +47,5 @@ func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, 
 	if err := r.send_command(args...); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }

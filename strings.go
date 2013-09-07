@@ -66,28 +66,14 @@ func (r *Redis) GetRange(key string, start, end int) (string, error) {
 	if err := r.send_command("GETRANGE", key, strconv.Itoa(start), strconv.Itoa(end)); err != nil {
 		return "", err
 	}
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
+	return r.string_reply()
 }
 
 func (r *Redis) GetSet(key, value string) (string, error) {
 	if err := r.send_command("GETSET", key, value); err != nil {
 		return "", err
 	}
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
+	return r.string_reply()
 }
 
 func (r *Redis) Incr(key string) (int, error) {
@@ -108,14 +94,7 @@ func (r *Redis) IncrByFloat(key string, increment string) (string, error) {
 	if err := r.send_command("INCRBYFLOAT", key, increment); err != nil {
 		return "", err
 	}
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
+	return r.string_reply()
 }
 
 func (r *Redis) MGet(key string, keys ...string) ([]*string, error) {
@@ -124,14 +103,7 @@ func (r *Redis) MGet(key string, keys ...string) ([]*string, error) {
 	if err := r.send_command(args...); err != nil {
 		return []*string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []*string{}, err
-	}
-	if multibulk == nil {
-		return []*string{}, NilBulkError
-	}
-	return *multibulk, nil
+	return r.strparray_reply()
 }
 
 func (r *Redis) MSet(keyvalues map[string]string) error {

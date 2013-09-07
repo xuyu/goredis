@@ -29,18 +29,7 @@ func (r *Redis) SDiff(key string, keys ...string) ([]string, error) {
 	if err := r.send_command(args...); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) SDiffStore(destination, key string, keys ...string) (int, error) {
@@ -58,18 +47,7 @@ func (r *Redis) SInter(key string, keys ...string) ([]string, error) {
 	if err := r.send_command(args...); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) SInterStore(destination, key string, keys ...string) (int, error) {
@@ -92,18 +70,7 @@ func (r *Redis) SMembers(key string) ([]string, error) {
 	if err := r.send_command("SMEMBERS", key); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) SMove(source, destination, member string) (bool, error) {
@@ -124,18 +91,7 @@ func (r *Redis) SRandomMember(key string, count int) ([]string, error) {
 	if err := r.send_command("SRANDOMMEMBER", key, strconv.Itoa(count)); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) SRem(key string, members ...string) (int, error) {
@@ -156,18 +112,7 @@ func (r *Redis) SUnion(key string, keys ...string) ([]string, error) {
 	if err := r.send_command(args...); err != nil {
 		return []string{}, err
 	}
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []string{}, err
-	}
-	if multibulk == nil {
-		return []string{}, NilBulkError
-	}
-	result := make([]string, len(*multibulk))
-	for _, item := range *multibulk {
-		result = append(result, *item)
-	}
-	return result, nil
+	return r.stringarray_reply()
 }
 
 func (r *Redis) SUnionStore(destination, key string, keys ...string) (int, error) {

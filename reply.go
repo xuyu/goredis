@@ -117,3 +117,67 @@ func (r *Redis) multibulk_reply() (*[]*string, error) {
 	}
 	return &result, nil
 }
+
+func (r *Redis) stringarray_reply() ([]string, error) {
+	result := []string{}
+	multibulk, err := r.multibulk_reply()
+	if err != nil {
+		return result, err
+	}
+	if multibulk == nil {
+		return result, NilBulkError
+	}
+	for _, p := range *multibulk {
+		result = append(result, *p)
+	}
+	return result, nil
+}
+
+func (r *Redis) stringmap_reply() (map[string]string, error) {
+	result := make(map[string]string)
+	multibulk, err := r.multibulk_reply()
+	if err != nil {
+		return result, err
+	}
+	if multibulk == nil {
+		return result, NilBulkError
+	}
+	n := len(*multibulk) / 2
+	for i := 0; i < n; i++ {
+		result[*(*multibulk)[i*2]] = *(*multibulk)[i*2+1]
+	}
+	return result, nil
+}
+
+func (r *Redis) string_reply() (string, error) {
+	bulk, err := r.bulk_reply()
+	if err != nil {
+		return "", err
+	}
+	if bulk == nil {
+		return "", NilBulkError
+	}
+	return *bulk, nil
+}
+
+func (r *Redis) strparray_reply() ([]*string, error) {
+	multibulk, err := r.multibulk_reply()
+	if err != nil {
+		return []*string{}, err
+	}
+	if multibulk == nil {
+		return []*string{}, NilBulkError
+	}
+	return *multibulk, nil
+}
+
+func (r *Redis) strarrayp_reply() (*[]string, error) {
+	multibulk, err := r.multibulk_reply()
+	if err != nil {
+		return nil, err
+	}
+	if multibulk == nil {
+		return nil, nil
+	}
+	return &[]string{*(*multibulk)[0], *(*multibulk)[1]}, nil
+}

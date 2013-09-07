@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -23,11 +22,10 @@ func TestClientName(t *testing.T) {
 func TestClientList(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
-	clients, err := r.ClientList()
+	_, err := r.ClientList()
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	fmt.Println(clients)
 }
 
 func TestDBSize(t *testing.T) {
@@ -57,29 +55,23 @@ func TestFlushDB(t *testing.T) {
 func TestInfo(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
-	if info, err := r.Info("default"); err != nil {
+	if _, err := r.Info("default"); err != nil {
 		t.Fatal(err.Error())
-	} else {
-		fmt.Println(info)
 	}
 }
 
 func TestLastSave(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
-	if timestamp, err := r.LastSave(); err != nil {
+	if _, err := r.LastSave(); err != nil {
 		t.Fatal(err.Error())
-	} else {
-		fmt.Println(timestamp)
 	}
 }
 
 func TestTime(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
-	if seconds, microseconds, err := r.Time(); err != nil {
+	if _, _, err := r.Time(); err != nil {
 		t.Fatal(err.Error())
-	} else {
-		fmt.Printf("%s, %s\n", seconds, microseconds)
 	}
 }

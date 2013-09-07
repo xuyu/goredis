@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -17,7 +16,6 @@ func TestAuth(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
 	if err := r.Auth("123"); err != nil {
-		fmt.Println(err.Error())
 	} else {
 		t.Fatal(err.Error())
 	}
@@ -30,7 +28,6 @@ func TestSelect(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	if err := r.Select(65535); err != nil {
-		fmt.Println(err.Error())
 	} else {
 		t.Fatal(err.Error())
 	}
@@ -49,10 +46,8 @@ func TestEcho(t *testing.T) {
 func TestPing(t *testing.T) {
 	r := initredis()
 	defer r.Quit()
-	if pong, err := r.Ping(); err != nil {
+	if _, err := r.Ping(); err != nil {
 		t.Fatal(err.Error())
-	} else {
-		fmt.Println(pong)
 	}
 }
 
