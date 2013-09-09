@@ -1,88 +1,96 @@
 package redis
 
 import (
-	"errors"
+	"bytes"
 	"strconv"
 )
 
 var (
-	NilBulkError = errors.New("Nil Bulk Reply")
+	STATUS_OK = []byte("OK")
 )
 
-func (r *Redis) read_head() ([]byte, []byte, error) {
-	data, err := r.reader.ReadBytes(LF)
+func (r *Redis) ParseHead() ([]byte, error) {
+	data, err := r.Reader.ReadBytes(LF)
 	if err != nil {
-		return []byte{}, []byte{}, err
+		return data, &ReaderError{err.Error()}
 	}
-	return data, data[1 : len(data)-2], nil
+	if data[0] == MINUS {
+		return data, &RedisError{data[1 : len(data)-2]}
+	}
+	return data[:len(data)-2], nil
 }
 
-func (r *Redis) status_reply() (string, error) {
-	data, head, err := r.read_head()
+func (r *Redis) StatusReply() ([]byte, error) {
+	head, err := r.ParseHead()
 	if err != nil {
-		return "", err
+		return head, err
 	}
-	if data[0] == PLUS {
-		return string(head), nil
+	if head[0] != PLUS {
+		return head, &ReplyTypeError{head}
 	}
-	return "", errors.New(string(head))
+	return head[1:], nil
 }
 
-func (r *Redis) ok_reply() error {
-	status, err := r.status_reply()
-	if err != nil {
+func (r *Redis) OKReply() error {
+	if status, err := r.StatusReply(); err != nil {
 		return err
-	}
-	if status != "OK" {
-		return errors.New(status)
+	} else if !bytes.Equal(status, STATUS_OK) {
+		return &ReplyTypeError{status}
 	}
 	return nil
 }
 
-func (r *Redis) bulk_reply() (*string, error) {
-	data, head, err := r.read_head()
+func (r *Redis) BulkReply() (*[]byte, error) {
+	head, err := r.ParseHead()
 	if err != nil {
 		return nil, err
 	}
-	if data[0] == DOLLAR {
-		size, err := strconv.Atoi(string(head))
-		if err != nil {
-			return nil, err
-		}
-		if size == -1 {
-			return nil, nil
-		}
-		buf := make([]byte, size+2)
-		if _, err := r.reader.Read(buf); err != nil {
-			return nil, err
-		}
-		bulk := string(buf[:size])
-		return &bulk, nil
+	if head[0] != DOLLAR {
+		return nil, &ReplyTypeError{head}
 	}
-	if data[0] == COLON {
-		bulk := string(head)
-		return &bulk, nil
+	size, err := strconv.Atoi(string(head[1:]))
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New(string(head))
+	if size == -1 {
+		return nil, nil
+	}
+	buf := make([]byte, size+2)
+	if _, err := r.Reader.Read(buf); err != nil {
+		return nil, &ReaderError{err.Error()}
+	}
+	bulk := buf[:size]
+	return &bulk, nil
 }
 
-func (r *Redis) integer_reply() (int, error) {
-	data, head, err := r.read_head()
+func (r *Redis) BytesReply() ([]byte, error) {
+	bulk, err := r.BulkReply()
+	if err != nil {
+		return []byte{}, err
+	}
+	if bulk == nil {
+		return []byte{}, &NilBulkError{}
+	}
+	return *bulk, nil
+}
+
+func (r *Redis) IntReply() (int64, error) {
+	head, err := r.ParseHead()
 	if err != nil {
 		return -1, err
 	}
-	if data[0] == COLON {
-		n, err := strconv.Atoi(string(head))
-		if err != nil {
-			return -1, err
-		}
-		return n, nil
+	if head[0] != COLON {
+		return -1, &ReplyTypeError{head}
 	}
-	return -1, errors.New(string(head))
+	n, err := strconv.ParseInt(string(head[1:]), 10, 64)
+	if err != nil {
+		return -1, err
+	}
+	return n, nil
 }
 
-func (r *Redis) bool_reply() (bool, error) {
-	i, err := r.integer_reply()
+func (r *Redis) BoolReply() (bool, error) {
+	i, err := r.IntReply()
 	if err != nil {
 		return false, err
 	}
@@ -92,24 +100,24 @@ func (r *Redis) bool_reply() (bool, error) {
 	return true, nil
 }
 
-func (r *Redis) multibulk_reply() (*[]*string, error) {
-	data, head, err := r.read_head()
+func (r *Redis) MultiBulkReply() (*[]*[]byte, error) {
+	head, err := r.ParseHead()
 	if err != nil {
 		return nil, err
 	}
-	if data[0] != STAR {
-		return nil, errors.New(string(head))
+	if head[0] != STAR {
+		return nil, &ReplyTypeError{head}
 	}
-	n, er := strconv.Atoi(string(head))
+	n, er := strconv.Atoi(string(head[1:]))
 	if er != nil {
 		return nil, er
 	}
 	if n == -1 {
 		return nil, nil
 	}
-	result := make([]*string, n)
+	result := make([]*[]byte, n)
 	for i := 0; i < n; i++ {
-		bulk, err := r.bulk_reply()
+		bulk, err := r.BulkReply()
 		if err != nil {
 			return nil, err
 		}
@@ -118,66 +126,41 @@ func (r *Redis) multibulk_reply() (*[]*string, error) {
 	return &result, nil
 }
 
-func (r *Redis) stringarray_reply() ([]string, error) {
-	result := []string{}
-	multibulk, err := r.multibulk_reply()
+func (r *Redis) ArrayReply() ([][]byte, error) {
+	multibulk, err := r.MultiBulkReply()
+	result := [][]byte{}
 	if err != nil {
 		return result, err
 	}
 	if multibulk == nil {
-		return result, NilBulkError
+		return result, &NilBulkError{}
 	}
 	for _, p := range *multibulk {
+		if p == nil {
+			return result, &NilBulkError{}
+		}
 		result = append(result, *p)
 	}
 	return result, nil
 }
 
-func (r *Redis) stringmap_reply() (map[string]string, error) {
-	result := make(map[string]string)
-	multibulk, err := r.multibulk_reply()
+func (r *Redis) MapReply() (map[string][]byte, error) {
+	multibulk, err := r.MultiBulkReply()
+	result := make(map[string][]byte)
 	if err != nil {
 		return result, err
 	}
 	if multibulk == nil {
-		return result, NilBulkError
+		return result, &NilBulkError{}
 	}
 	n := len(*multibulk) / 2
 	for i := 0; i < n; i++ {
-		result[*(*multibulk)[i*2]] = *(*multibulk)[i*2+1]
+		key := (*multibulk)[i*2]
+		value := (*multibulk)[i*2+1]
+		if key == nil || value == nil {
+			return result, &NilBulkError{}
+		}
+		result[string(*key)] = *value
 	}
 	return result, nil
-}
-
-func (r *Redis) string_reply() (string, error) {
-	bulk, err := r.bulk_reply()
-	if err != nil {
-		return "", err
-	}
-	if bulk == nil {
-		return "", NilBulkError
-	}
-	return *bulk, nil
-}
-
-func (r *Redis) strparray_reply() ([]*string, error) {
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return []*string{}, err
-	}
-	if multibulk == nil {
-		return []*string{}, NilBulkError
-	}
-	return *multibulk, nil
-}
-
-func (r *Redis) strarrayp_reply() (*[]string, error) {
-	multibulk, err := r.multibulk_reply()
-	if err != nil {
-		return nil, err
-	}
-	if multibulk == nil {
-		return nil, nil
-	}
-	return &[]string{*(*multibulk)[0], *(*multibulk)[1]}, nil
 }

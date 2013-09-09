@@ -19,28 +19,22 @@ var (
 	DELIM = []byte{CR, LF}
 )
 
-func build_request(args ...string) ([]byte, error) {
+func FormatSize(head byte, size int) []byte {
+	line := []byte{head}
+	line = strconv.AppendInt(line, int64(size), 10)
+	return append(line, DELIM...)
+}
+
+func BuildRequest(args [][]byte) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	if err := buf.WriteByte(STAR); err != nil {
-		return buf.Bytes(), err
-	}
-	if _, err := buf.WriteString(strconv.Itoa(len(args))); err != nil {
-		return buf.Bytes(), err
-	}
-	if _, err := buf.Write(DELIM); err != nil {
+	if _, err := buf.Write(FormatSize(STAR, len(args))); err != nil {
 		return buf.Bytes(), err
 	}
 	for _, arg := range args {
-		if err := buf.WriteByte(DOLLAR); err != nil {
+		if _, err := buf.Write(FormatSize(DOLLAR, len(arg))); err != nil {
 			return buf.Bytes(), err
 		}
-		if _, err := buf.WriteString(strconv.Itoa(len(arg))); err != nil {
-			return buf.Bytes(), err
-		}
-		if _, err := buf.Write(DELIM); err != nil {
-			return buf.Bytes(), err
-		}
-		if _, err := buf.WriteString(arg); err != nil {
+		if _, err := buf.Write(arg); err != nil {
 			return buf.Bytes(), err
 		}
 		if _, err := buf.Write(DELIM); err != nil {

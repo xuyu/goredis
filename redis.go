@@ -2,57 +2,49 @@ package redis
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"time"
 )
 
 type Redis struct {
-	network         string
-	address         string
-	database        int
-	password        string
-	connect_timeout time.Duration
-	conn            net.Conn
-	reader          *bufio.Reader
+	Network string
+	Address string
+	Timeout time.Duration
+	Conn    net.Conn
+	Reader  *bufio.Reader
+}
+
+func NewClient(network, address string, timeout time.Duration) *Redis {
+	return &Redis{Network: network, Address: address, Timeout: timeout}
 }
 
 func (r *Redis) Connect() error {
-	if r.network == "" {
-		r.network = "tcp"
-	}
-	if r.address == "" {
-		r.address = ":6379"
-	}
-	var err error
-	if r.connect_timeout > 0 {
-		r.conn, err = net.DialTimeout(r.network, r.address, r.connect_timeout)
-	} else {
-		r.conn, err = net.Dial(r.network, r.address)
-	}
-	if err != nil {
+	if conn, err := net.DialTimeout(r.Network, r.Address, r.Timeout); err != nil {
 		return err
+	} else {
+		r.Conn = conn
+		r.Reader = bufio.NewReader(r.Conn)
+		return nil
 	}
-	r.reader = bufio.NewReader(r.conn)
-	if r.password != "" {
-		err := r.Auth(r.password)
-		if err != nil {
-			return err
-		}
-	}
-	if r.database != 0 {
-		err := r.Select(r.database)
-		if err != nil {
-			return err
-		}
+}
+
+func (r *Redis) Close() error {
+	if r.Conn != nil {
+		return r.Conn.Close()
 	}
 	return nil
 }
 
-func (r *Redis) send_command(args ...string) error {
-	buf, err := build_request(args...)
-	if err != nil {
+func (r *Redis) SendCommand(args ...interface{}) error {
+	fields := [][]byte{}
+	for _, arg := range args {
+		fields = append(fields, []byte(fmt.Sprint(arg)))
+	}
+	if buf, err := BuildRequest(fields); err != nil {
+		return err
+	} else {
+		_, err := r.Conn.Write(buf)
 		return err
 	}
-	_, er := r.conn.Write(buf)
-	return er
 }
