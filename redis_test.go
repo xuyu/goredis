@@ -76,3 +76,67 @@ func TestBoolReply(t *testing.T) {
 		t.Fatal(b)
 	}
 }
+
+func TestBytesReply(t *testing.T) {
+	r.Connect()
+	defer r.Close()
+	r.SendCommand("SET", "key", "value")
+	r.OKReply()
+	if err := r.SendCommand("GET", "key"); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := r.BytesReply(); err != nil {
+		t.Fatal(err)
+	} else if string(b) != "value" {
+		t.Fatal(string(b))
+	}
+}
+
+func TestBulkReply(t *testing.T) {
+	r.Connect()
+	defer r.Close()
+	if err := r.SendCommand("GET", "nokey"); err != nil {
+		t.Fatal(err)
+	}
+	if bulk, err := r.BulkReply(); err != nil {
+		t.Fatal(err)
+	} else if bulk != nil {
+		t.Fatal(bulk)
+	}
+}
+
+func TestArrayReply(t *testing.T) {
+	r.Connect()
+	defer r.Close()
+	r.SendCommand("DEL", "key")
+	r.IntReply()
+	r.SendCommand("SADD", "key", "value1", "value2", "value3")
+	r.IntReply()
+	if err := r.SendCommand("SMEMBERS", "key"); err != nil {
+		t.Fatal(err)
+	}
+	if arr, err := r.ArrayReply(); err != nil {
+		t.Fatal(err)
+	} else if len(arr) != 3 {
+		t.Fatal(arr)
+	}
+}
+
+func TestMapReply(t *testing.T) {
+	r.Connect()
+	defer r.Close()
+	r.SendCommand("DEL", "key")
+	r.IntReply()
+	r.SendCommand("HSET", "key", "k1", "v1")
+	r.IntReply()
+	r.SendCommand("HSET", "key", "k2", "v2")
+	r.IntReply()
+	if err := r.SendCommand("HGETALL", "key"); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := r.MapReply(); err != nil {
+		t.Fatal(err)
+	} else if len(m) != 2 {
+		t.Fatal(m)
+	}
+}
