@@ -41,10 +41,8 @@ func (r *Redis) SendCommand(args ...interface{}) error {
 	for _, arg := range args {
 		fields = append(fields, []byte(fmt.Sprint(arg)))
 	}
-	if buf, err := BuildRequest(fields); err != nil {
-		return err
-	} else {
-		_, err := r.Conn.Write(buf)
+	if err := r.BuildRequest(fields); err != nil {
 		return err
 	}
+	return nil
 }

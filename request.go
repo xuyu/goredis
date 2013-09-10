@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"bytes"
 	"strconv"
 )
 
@@ -25,21 +24,20 @@ func FormatSize(head byte, size int) []byte {
 	return append(line, DELIM...)
 }
 
-func BuildRequest(args [][]byte) ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	if _, err := buf.Write(FormatSize(STAR, len(args))); err != nil {
-		return buf.Bytes(), err
+func (r *Redis) BuildRequest(args [][]byte) error {
+	if _, err := r.Conn.Write(FormatSize(STAR, len(args))); err != nil {
+		return err
 	}
 	for _, arg := range args {
-		if _, err := buf.Write(FormatSize(DOLLAR, len(arg))); err != nil {
-			return buf.Bytes(), err
+		if _, err := r.Conn.Write(FormatSize(DOLLAR, len(arg))); err != nil {
+			return err
 		}
-		if _, err := buf.Write(arg); err != nil {
-			return buf.Bytes(), err
+		if _, err := r.Conn.Write(arg); err != nil {
+			return err
 		}
-		if _, err := buf.Write(DELIM); err != nil {
-			return buf.Bytes(), err
+		if _, err := r.Conn.Write(DELIM); err != nil {
+			return err
 		}
 	}
-	return buf.Bytes(), nil
+	return nil
 }
