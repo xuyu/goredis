@@ -5,17 +5,19 @@ import (
 	"time"
 )
 
-var r = NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
-
 func TestConnect(t *testing.T) {
-	if err := r.Connect(); err != nil {
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
-	r.Close()
+	defer r.Close()
 }
 
 func TestErrorReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	if err := r.SendCommand("AUTH", "nopassword"); err != nil {
 		t.Fatal(err)
@@ -28,7 +30,10 @@ func TestErrorReply(t *testing.T) {
 }
 
 func TestStatusReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	if err := r.SendCommand("PING"); err != nil {
 		t.Fatal(err)
@@ -41,7 +46,10 @@ func TestStatusReply(t *testing.T) {
 }
 
 func TestOKReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	if err := r.SendCommand("SELECT", 1); err != nil {
 		t.Fatal(err)
@@ -52,7 +60,10 @@ func TestOKReply(t *testing.T) {
 }
 
 func TestIntReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	if err := r.SendCommand("DBSIZE"); err != nil {
 		t.Fatal(err)
@@ -63,7 +74,10 @@ func TestIntReply(t *testing.T) {
 }
 
 func TestBoolReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	r.SendCommand("SET", "key", "value")
 	r.OKReply()
@@ -78,7 +92,10 @@ func TestBoolReply(t *testing.T) {
 }
 
 func TestBytesReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	r.SendCommand("SET", "key", "value")
 	r.OKReply()
@@ -93,7 +110,10 @@ func TestBytesReply(t *testing.T) {
 }
 
 func TestBulkReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	if err := r.SendCommand("GET", "nokey"); err != nil {
 		t.Fatal(err)
@@ -106,7 +126,10 @@ func TestBulkReply(t *testing.T) {
 }
 
 func TestArrayReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	r.SendCommand("DEL", "key")
 	r.IntReply()
@@ -123,7 +146,10 @@ func TestArrayReply(t *testing.T) {
 }
 
 func TestMapReply(t *testing.T) {
-	r.Connect()
+	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer r.Close()
 	r.SendCommand("DEL", "key")
 	r.IntReply()

@@ -2,20 +2,26 @@ package redis
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
 var (
-	STATUS_OK = []byte("OK")
+	NilBulkError = errors.New("Nil Bulk Error")
+	STATUS_OK    = []byte("OK")
 )
+
+func ReplyTypeError(head []byte) error {
+	return errors.New(string(head))
+}
 
 func (r *Redis) ParseHead() ([]byte, error) {
 	data, err := r.Reader.ReadBytes(LF)
 	if err != nil {
-		return data, &ReaderError{err.Error()}
+		return data, err
 	}
 	if data[0] == MINUS {
-		return data, &RedisError{data[1 : len(data)-2]}
+		return data, errors.New(string(data[1 : len(data)-2]))
 	}
 	return data[:len(data)-2], nil
 }
@@ -26,7 +32,7 @@ func (r *Redis) StatusReply() ([]byte, error) {
 		return head, err
 	}
 	if head[0] != PLUS {
-		return head, &ReplyTypeError{head}
+		return head, ReplyTypeError(head)
 	}
 	return head[1:], nil
 }
@@ -35,7 +41,7 @@ func (r *Redis) OKReply() error {
 	if status, err := r.StatusReply(); err != nil {
 		return err
 	} else if !bytes.Equal(status, STATUS_OK) {
-		return &ReplyTypeError{status}
+		return errors.New(string(status))
 	}
 	return nil
 }
@@ -46,7 +52,7 @@ func (r *Redis) BulkReply() (*[]byte, error) {
 		return nil, err
 	}
 	if head[0] != DOLLAR {
-		return nil, &ReplyTypeError{head}
+		return nil, ReplyTypeError(head)
 	}
 	size, err := strconv.Atoi(string(head[1:]))
 	if err != nil {
@@ -57,7 +63,7 @@ func (r *Redis) BulkReply() (*[]byte, error) {
 	}
 	buf := make([]byte, size+2)
 	if _, err := r.Reader.Read(buf); err != nil {
-		return nil, &ReaderError{err.Error()}
+		return nil, err
 	}
 	bulk := buf[:size]
 	return &bulk, nil
@@ -69,7 +75,7 @@ func (r *Redis) BytesReply() ([]byte, error) {
 		return []byte{}, err
 	}
 	if bulk == nil {
-		return []byte{}, &NilBulkError{}
+		return []byte{}, NilBulkError
 	}
 	return *bulk, nil
 }
@@ -80,7 +86,7 @@ func (r *Redis) IntReply() (int64, error) {
 		return -1, err
 	}
 	if head[0] != COLON {
-		return -1, &ReplyTypeError{head}
+		return -1, ReplyTypeError(head)
 	}
 	n, err := strconv.ParseInt(string(head[1:]), 10, 64)
 	if err != nil {
@@ -106,7 +112,7 @@ func (r *Redis) MultiBulkReply() (*[]*[]byte, error) {
 		return nil, err
 	}
 	if head[0] != STAR {
-		return nil, &ReplyTypeError{head}
+		return nil, ReplyTypeError(head)
 	}
 	n, er := strconv.Atoi(string(head[1:]))
 	if er != nil {
@@ -133,11 +139,11 @@ func (r *Redis) ArrayReply() ([][]byte, error) {
 		return result, err
 	}
 	if multibulk == nil {
-		return result, &NilBulkError{}
+		return result, NilBulkError
 	}
 	for _, p := range *multibulk {
 		if p == nil {
-			return result, &NilBulkError{}
+			return result, NilBulkError
 		}
 		result = append(result, *p)
 	}
@@ -151,14 +157,14 @@ func (r *Redis) MapReply() (map[string][]byte, error) {
 		return result, err
 	}
 	if multibulk == nil {
-		return result, &NilBulkError{}
+		return result, NilBulkError
 	}
 	n := len(*multibulk) / 2
 	for i := 0; i < n; i++ {
 		key := (*multibulk)[i*2]
 		value := (*multibulk)[i*2+1]
 		if key == nil || value == nil {
-			return result, &NilBulkError{}
+			return result, NilBulkError
 		}
 		result[string(*key)] = *value
 	}
