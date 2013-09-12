@@ -1,4 +1,4 @@
-goredis
+redis
 =======
 
-redis client for golang
+redis client in golang
