@@ -55,33 +55,47 @@ func (r *Redis) Close() error {
 	return nil
 }
 
-func (r *Redis) SendCommand(args ...interface{}) error {
+func (r *Redis) Command(args ...interface{}) *Reply {
+	rep := &Reply{}
 	if err := r.Writer.WriteByte(STAR); err != nil {
-		return err
+		rep.Error = err
+		return rep
 	}
 	if _, err := r.Writer.WriteString(strconv.Itoa(len(args))); err != nil {
-		return err
+		rep.Error = err
+		return rep
 	}
 	if _, err := r.Writer.Write(DELIM); err != nil {
-		return err
+		rep.Error = err
+		return rep
 	}
 	for _, arg := range args {
 		s := fmt.Sprint(arg)
 		if err := r.Writer.WriteByte(DOLLAR); err != nil {
-			return err
+			rep.Error = err
+			return rep
 		}
 		if _, err := r.Writer.WriteString(strconv.Itoa(len(s))); err != nil {
-			return err
+			rep.Error = err
+			return rep
 		}
 		if _, err := r.Writer.Write(DELIM); err != nil {
-			return err
+			rep.Error = err
+			return rep
 		}
 		if _, err := r.Writer.WriteString(s); err != nil {
-			return err
+			rep.Error = err
+			return rep
 		}
 		if _, err := r.Writer.Write(DELIM); err != nil {
-			return err
+			rep.Error = err
+			return rep
 		}
 	}
-	return r.Writer.Flush()
+	if err := r.Writer.Flush(); err != nil {
+		rep.Error = err
+		return rep
+	}
+	r.get_reply(rep)
+	return rep
 }

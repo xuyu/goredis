@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bytes"
 	"testing"
 	"time"
 )
@@ -19,13 +20,9 @@ func TestErrorReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := r.SendCommand("AUTH", "nopassword"); err != nil {
-		t.Fatal(err)
-	}
-	if status, err := r.StatusReply(); err == nil {
-		t.Fatal(status)
-	} else {
-		t.Log(status)
+	rep := r.Command("AUTH", "nopassword")
+	if rep.Type != ErrorReply || rep.Error == nil {
+		t.Error(rep)
 	}
 }
 
@@ -35,13 +32,12 @@ func TestStatusReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := r.SendCommand("PING"); err != nil {
-		t.Fatal(err)
+	rep := r.Command("PING")
+	if rep.Error != nil || rep.Type != StatusReply {
+		t.Error(rep)
 	}
-	if status, err := r.StatusReply(); err != nil {
-		t.Fatal(err)
-	} else if string(status) != "PONG" {
-		t.Fatal(string(status))
+	if string(rep.Status) != "PONG" {
+		t.Error(string(rep.Status))
 	}
 }
 
@@ -51,11 +47,12 @@ func TestOKReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := r.SendCommand("SELECT", 1); err != nil {
-		t.Fatal(err)
+	rep := r.Command("SELECT", 1)
+	if rep.Error != nil {
+		t.Error(rep)
 	}
-	if err := r.OKReply(); err != nil {
-		t.Fatal(err)
+	if err := rep.OK(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -65,11 +62,9 @@ func TestIntReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := r.SendCommand("DBSIZE"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := r.IntReply(); err != nil {
-		t.Fatal(err)
+	rep := r.Command("DBSIZE")
+	if rep.Error != nil || rep.Type != IntReply {
+		t.Error(rep)
 	}
 }
 
@@ -79,33 +74,15 @@ func TestBoolReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.SendCommand("SET", "key", "value")
-	r.OKReply()
-	if err := r.SendCommand("EXISTS", "key"); err != nil {
-		t.Fatal(err)
+	r.Command("SET", "key", "value")
+	rep := r.Command("EXISTS", "key")
+	if rep.Error != nil {
+		t.Error(rep)
 	}
-	if b, err := r.BoolReply(); err != nil {
-		t.Fatal(err)
+	if b, err := rep.Bool(); err != nil {
+		t.Error(err)
 	} else if !b {
-		t.Fatal(b)
-	}
-}
-
-func TestBytesReply(t *testing.T) {
-	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	r.SendCommand("SET", "key", "value")
-	r.OKReply()
-	if err := r.SendCommand("GET", "key"); err != nil {
-		t.Fatal(err)
-	}
-	if b, err := r.BytesReply(); err != nil {
-		t.Fatal(err)
-	} else if string(b) != "value" {
-		t.Fatal(string(b))
+		t.Error(rep)
 	}
 }
 
@@ -115,33 +92,37 @@ func TestBulkReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := r.SendCommand("GET", "nokey"); err != nil {
-		t.Fatal(err)
+	rep := r.Command("GET", "nokey")
+	if rep.Error != nil {
+		t.Error(rep)
 	}
-	if bulk, err := r.BulkReply(); err != nil {
-		t.Fatal(err)
-	} else if bulk != nil {
-		t.Fatal(bulk)
+	if rep.Type != BulkReply || rep.Bulk != nil {
+		t.Error(rep)
+	}
+	r.Command("SET", "key", "value")
+	rep = r.Command("GET", "key")
+	if rep.Error != nil || rep.Type != BulkReply || rep.Bulk == nil {
+		t.Error(rep)
+	}
+	if !bytes.Equal(rep.Bulk, []byte("value")) {
+		t.Error(rep)
 	}
 }
 
-func TestArrayReply(t *testing.T) {
+func TestMultiReply(t *testing.T) {
 	r, err := NewClient("tcp4", "127.0.0.1:6379", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.SendCommand("DEL", "key")
-	r.IntReply()
-	r.SendCommand("SADD", "key", "value1", "value2", "value3")
-	r.IntReply()
-	if err := r.SendCommand("SMEMBERS", "key"); err != nil {
-		t.Fatal(err)
+	r.Command("DEL", "key")
+	r.Command("SADD", "key", "value1", "value2", "value3")
+	rep := r.Command("SMEMBERS", "key")
+	if rep.Error != nil || rep.Type != MultiReply || rep.Multi == nil {
+		t.Error(rep)
 	}
-	if arr, err := r.ArrayReply(); err != nil {
-		t.Fatal(err)
-	} else if len(arr) != 3 {
-		t.Fatal(arr)
+	if len(rep.Multi) != 3 || len(rep.Multi[0]) != 6 {
+		t.Error(rep)
 	}
 }
 
@@ -151,18 +132,18 @@ func TestMapReply(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.SendCommand("DEL", "key")
-	r.IntReply()
-	r.SendCommand("HSET", "key", "k1", "v1")
-	r.IntReply()
-	r.SendCommand("HSET", "key", "k2", "v2")
-	r.IntReply()
-	if err := r.SendCommand("HGETALL", "key"); err != nil {
-		t.Fatal(err)
+	r.Command("DEL", "key")
+	r.Command("HSET", "key", "k1", "v1")
+	r.Command("HSET", "key", "k2", "v2")
+	rep := r.Command("HGETALL", "key")
+	if rep.Error != nil {
+		t.Error(rep.Error)
 	}
-	if m, err := r.MapReply(); err != nil {
-		t.Fatal(err)
+	if m, err := rep.Map(); err != nil {
+		t.Error(err)
 	} else if len(m) != 2 {
-		t.Fatal(m)
+		t.Error(m)
+	} else if !bytes.Equal(m["k1"], []byte("v1")) {
+		t.Error(rep)
 	}
 }
