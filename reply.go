@@ -32,7 +32,7 @@ func (r *Redis) Recv() (*Reply, error) {
 	switch data[0] {
 	case MINUS:
 		reply.Type = ErrorReply
-		reply.Error = errors.New(string(data[1 : len(data)-2]))
+		reply.Error = errors.New(string(head))
 	case PLUS:
 		reply.Type = StatusReply
 		reply.Status = string(head)
