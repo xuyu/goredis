@@ -42,7 +42,7 @@ func DialTimeout(network, address string, timeout time.Duration) (*Redis, error)
 	r.Conn = conn
 	r.Reader = bufio.NewReader(r.Conn)
 	r.Writer = bufio.NewWriter(r.Conn)
-	return r, err
+	return r, nil
 }
 
 func Dial(network, address string) (*Redis, error) {
