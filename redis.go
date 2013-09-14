@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -19,7 +20,8 @@ const (
 )
 
 var (
-	DELIM = []byte{CR, LF}
+	DELIM              = []byte{CR, LF}
+	DefaultDialTimeout = 15 * time.Second
 )
 
 type Redis struct {
@@ -31,21 +33,20 @@ type Redis struct {
 	Writer  *bufio.Writer
 }
 
-func NewClient(network, address string, timeout time.Duration) (*Redis, error) {
+func DialTimeout(network, address string, timeout time.Duration) (*Redis, error) {
 	r := &Redis{Network: network, Address: address, Timeout: timeout}
-	err := r.Connect()
-	return r, err
-}
-
-func (r *Redis) Connect() error {
 	conn, err := net.DialTimeout(r.Network, r.Address, r.Timeout)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	r.Conn = conn
 	r.Reader = bufio.NewReader(r.Conn)
 	r.Writer = bufio.NewWriter(r.Conn)
-	return nil
+	return r, err
+}
+
+func Dial(network, address string) (*Redis, error) {
+	return DialTimeout(network, address, DefaultDialTimeout)
 }
 
 func (r *Redis) Close() error {
@@ -55,47 +56,87 @@ func (r *Redis) Close() error {
 	return nil
 }
 
-func (r *Redis) Command(args ...interface{}) *Reply {
-	rep := &Reply{}
+func (r *Redis) Send(args ...interface{}) error {
 	if err := r.Writer.WriteByte(STAR); err != nil {
-		rep.Error = err
-		return rep
+		return err
 	}
 	if _, err := r.Writer.WriteString(strconv.Itoa(len(args))); err != nil {
-		rep.Error = err
-		return rep
+		return err
 	}
 	if _, err := r.Writer.Write(DELIM); err != nil {
-		rep.Error = err
-		return rep
+		return err
 	}
 	for _, arg := range args {
 		s := fmt.Sprint(arg)
 		if err := r.Writer.WriteByte(DOLLAR); err != nil {
-			rep.Error = err
-			return rep
+			return err
 		}
 		if _, err := r.Writer.WriteString(strconv.Itoa(len(s))); err != nil {
-			rep.Error = err
-			return rep
+			return err
 		}
 		if _, err := r.Writer.Write(DELIM); err != nil {
-			rep.Error = err
-			return rep
+			return err
 		}
 		if _, err := r.Writer.WriteString(s); err != nil {
-			rep.Error = err
-			return rep
+			return err
 		}
 		if _, err := r.Writer.Write(DELIM); err != nil {
-			rep.Error = err
-			return rep
+			return err
 		}
 	}
 	if err := r.Writer.Flush(); err != nil {
-		rep.Error = err
-		return rep
+		return err
 	}
-	r.get_reply(rep)
-	return rep
+	return nil
+}
+
+func (r *Redis) SendRecv(args ...interface{}) (*Reply, error) {
+	if err := r.Send(args...); err != nil {
+		return nil, err
+	}
+	return r.Recv()
+}
+
+func OK(reply *Reply, err error) error {
+	if err != nil {
+		return err
+	}
+	if reply.Type != StatusReply {
+		return errors.New("Make ok error")
+	}
+	if reply.Status == "OK" {
+		return nil
+	}
+	return errors.New(reply.Status)
+}
+
+func Bool(reply *Reply, err error) (bool, error) {
+	if err != nil {
+		return false, err
+	}
+	if reply.Type != IntReply {
+		return false, errors.New("Make bool error")
+	}
+	if reply.Int == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+func Map(reply *Reply, err error) (map[string][]byte, error) {
+	if err != nil {
+		return nil, err
+	}
+	if reply.Type != MultiReply || reply.Multi == nil {
+		return nil, errors.New("Make map error")
+	}
+	result := make(map[string][]byte, len(reply.Multi)/2)
+	for i := 0; i < len(reply.Multi)/2; i++ {
+		key := reply.Multi[i*2]
+		if key == nil {
+			return nil, errors.New("Nil Bulk Error")
+		}
+		result[string(key)] = reply.Multi[i*2+1]
+	}
+	return result, nil
 }
