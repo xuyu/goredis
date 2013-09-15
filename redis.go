@@ -17,11 +17,12 @@ const (
 	MINUS  byte = 45
 	PLUS   byte = 43
 	STAR   byte = 42
+
+	DefaultDialTimeout time.Duration = 15 * time.Second
 )
 
 var (
-	DELIM              = []byte{CR, LF}
-	DefaultDialTimeout = 15 * time.Second
+	DELIM = []byte{CR, LF}
 )
 
 type Redis struct {
