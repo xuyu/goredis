@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -10,134 +11,226 @@ import (
 )
 
 const (
-	CR     byte = 13
-	LF     byte = 10
-	DOLLAR byte = 36
-	COLON  byte = 58
-	MINUS  byte = 45
-	PLUS   byte = 43
-	STAR   byte = 42
-
-	DefaultDialTimeout time.Duration = 15 * time.Second
+	MAX_CONNECTIONS = 1024
 )
 
-var (
-	DELIM = []byte{CR, LF}
+const (
+	StatusReply = iota
+	NumberReply
+	BulkReply
+	MultiReply
 )
 
-type Redis struct {
-	Network string
-	Address string
-	Timeout time.Duration
-	Conn    net.Conn
-	Reader  *bufio.Reader
-	Writer  *bufio.Writer
+type reply struct {
+	Type   int
+	Status string
+	Number int64
+	Bulk   []byte
+	Multi  [][]byte
 }
 
-func DialTimeout(network, address string, timeout time.Duration) (*Redis, error) {
-	r := &Redis{Network: network, Address: address, Timeout: timeout}
-	conn, err := net.DialTimeout(r.Network, r.Address, r.Timeout)
+type Redis struct {
+	network  string
+	address  string
+	db       int
+	password string
+	timeout  time.Duration
+	size     int
+	pool     chan net.Conn
+}
+
+func DialTimeout(network, address string, db int, password string, timeout time.Duration, size int) (*Redis, error) {
+	if size < 1 {
+		size = 1
+	} else if size > MAX_CONNECTIONS {
+		size = MAX_CONNECTIONS
+	}
+	if db < 0 {
+		db = 0
+	}
+	r := &Redis{
+		network:  network,
+		address:  address,
+		db:       db,
+		password: password,
+		timeout:  timeout,
+		size:     size,
+		pool:     make(chan net.Conn, size),
+	}
+	for i := 0; i < size; i++ {
+		r.pool <- nil
+	}
+	conn, err := r.getConnection()
 	if err != nil {
 		return nil, err
 	}
-	r.Conn = conn
-	r.Reader = bufio.NewReader(r.Conn)
-	r.Writer = bufio.NewWriter(r.Conn)
+	r.activeConnection(conn)
 	return r, nil
 }
 
-func Dial(network, address string) (*Redis, error) {
-	return DialTimeout(network, address, DefaultDialTimeout)
+func (r *Redis) getConnection() (net.Conn, error) {
+	c := <-r.pool
+	if c == nil {
+		return r.openConnection()
+	}
+	return c, nil
 }
 
-func (r *Redis) Close() error {
-	if r.Conn != nil {
-		return r.Conn.Close()
+func (r *Redis) activeConnection(conn net.Conn) {
+	r.pool <- conn
+}
+
+func (r *Redis) openConnection() (net.Conn, error) {
+	conn, err := net.DialTimeout(r.network, r.address, r.timeout)
+	if err != nil {
+		return nil, err
+	}
+	if r.password != "" {
+		if err := r.sendConnectionCmd(conn, "AUTH", r.password); err != nil {
+			return nil, err
+		}
+		if _, err := r.recvConnectionReply(conn); err != nil {
+			return nil, err
+		}
+	}
+	if r.db > 0 {
+		if err := r.sendConnectionCmd(conn, "SELECT", r.db); err != nil {
+			return nil, err
+		}
+		if _, err := r.recvConnectionReply(conn); err != nil {
+			return nil, err
+		}
+	}
+	return conn, nil
+}
+
+func (r *Redis) sendConnectionCmd(conn net.Conn, args ...interface{}) error {
+	cmd, err := r.packCommand(args...)
+	if err != nil {
+		return err
+	}
+	if _, err := conn.Write(cmd); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (r *Redis) Send(args ...interface{}) error {
-	if err := r.Writer.WriteByte(STAR); err != nil {
-		return err
-	}
-	if _, err := r.Writer.WriteString(strconv.Itoa(len(args))); err != nil {
-		return err
-	}
-	if _, err := r.Writer.Write(DELIM); err != nil {
-		return err
+func (r *Redis) packCommand(args ...interface{}) ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	if _, err := fmt.Fprintf(buf, "*%d\r\n", len(args)); err != nil {
+		return nil, err
 	}
 	for _, arg := range args {
 		s := fmt.Sprint(arg)
-		if err := r.Writer.WriteByte(DOLLAR); err != nil {
-			return err
-		}
-		if _, err := r.Writer.WriteString(strconv.Itoa(len(s))); err != nil {
-			return err
-		}
-		if _, err := r.Writer.Write(DELIM); err != nil {
-			return err
-		}
-		if _, err := r.Writer.WriteString(s); err != nil {
-			return err
-		}
-		if _, err := r.Writer.Write(DELIM); err != nil {
-			return err
+		if _, err := fmt.Fprintf(buf, "$%d\r\n%s\r\n", len(s), s); err != nil {
+			return nil, err
 		}
 	}
-	if err := r.Writer.Flush(); err != nil {
-		return err
-	}
-	return nil
+	return buf.Bytes(), nil
 }
 
-func (r *Redis) SendRecv(args ...interface{}) (*Reply, error) {
-	if err := r.Send(args...); err != nil {
-		return nil, err
-	}
-	return r.Recv()
-}
-
-func OK(reply *Reply, err error) error {
-	if err != nil {
-		return err
-	}
-	if reply.Type != StatusReply {
-		return errors.New("Make ok error")
-	}
-	if reply.Status == "OK" {
-		return nil
-	}
-	return errors.New(reply.Status)
-}
-
-func Bool(reply *Reply, err error) (bool, error) {
-	if err != nil {
-		return false, err
-	}
-	if reply.Type != IntReply {
-		return false, errors.New("Make bool error")
-	}
-	if reply.Int == 0 {
-		return false, nil
-	}
-	return true, nil
-}
-
-func Map(reply *Reply, err error) (map[string][]byte, error) {
+func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadBytes('\n')
 	if err != nil {
 		return nil, err
 	}
-	if reply.Type != MultiReply || reply.Multi == nil {
-		return nil, errors.New("Make map error")
-	}
-	result := make(map[string][]byte, len(reply.Multi)/2)
-	for i := 0; i < len(reply.Multi)/2; i++ {
-		key := reply.Multi[i*2]
-		if key == nil {
-			return nil, errors.New("Nil Bulk Error")
+	line = line[:len(line)-2]
+	switch line[0] {
+	case '-':
+		return nil, errors.New(string(line[1:]))
+	case '+':
+		return &reply{
+			Type:   StatusReply,
+			Status: string(line[1:]),
+		}, nil
+	case ':':
+		i, err := strconv.ParseInt(string(line[1:]), 10, 64)
+		if err != nil {
+			return nil, err
 		}
-		result[string(key)] = reply.Multi[i*2+1]
+		return &reply{
+			Type:   NumberReply,
+			Number: i,
+		}, nil
+	case '$':
+		size, err := strconv.Atoi(string(line[1:]))
+		if err != nil {
+			return nil, err
+		}
+		bulk, err := r.readSize(reader, size)
+		if err != nil {
+			return nil, err
+		}
+		return &reply{
+			Type: BulkReply,
+			Bulk: bulk,
+		}, nil
+	case '*':
+		i, err := strconv.Atoi(string(line[1:]))
+		if err != nil {
+			return nil, err
+		}
+		multi := make([][]byte, i)
+		for j := 0; j < i; j++ {
+			bulk, err := r.readBulk(reader)
+			if err != nil {
+				return nil, err
+			}
+			multi[j] = bulk
+		}
+		return &reply{
+			Type:  MultiReply,
+			Multi: multi,
+		}, nil
 	}
-	return result, nil
+	return nil, errors.New("redis protocol error")
+}
+
+func (r *Redis) readBulk(reader *bufio.Reader) ([]byte, error) {
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return nil, err
+	}
+	if line[0] != '$' {
+		return nil, errors.New("not bulk head prefix")
+	}
+	size, err := strconv.Atoi(string(line[1 : len(line)-2]))
+	if err != nil {
+		return nil, err
+	}
+	return r.readSize(reader, size)
+}
+
+func (r *Redis) readSize(reader *bufio.Reader, size int) ([]byte, error) {
+	if size < 0 {
+		return nil, nil
+	}
+	buf := make([]byte, size+2)
+	if _, err := reader.Read(buf); err != nil {
+		return nil, err
+	}
+	return buf[:size], nil
+}
+
+func (r *Redis) Close() {
+	for {
+		conn, ok := <-r.pool
+		if !ok {
+			break
+		}
+		conn.Close()
+	}
+}
+
+func (r *Redis) sendCommand(args ...interface{}) (*reply, error) {
+	conn, err := r.getConnection()
+	defer r.activeConnection(conn)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.sendConnectionCmd(conn, args...); err != nil {
+		return nil, err
+	}
+	return r.recvConnectionReply(conn)
 }
