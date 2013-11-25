@@ -496,11 +496,6 @@ func (r *Redis) Del(keys ...string) (int64, error) {
 	return r.integerReturnValue(rp), nil
 }
 
-func (r *Redis) Discard() error {
-	_, err := r.sendCommand("DISCARD")
-	return err
-}
-
 func (r *Redis) Dump(key string) ([]byte, error) {
 	rp, err := r.sendCommand("DUMP", key)
 	if err != nil {
@@ -530,14 +525,6 @@ func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error
 
 func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*Reply, error) {
 	return r.Eval(sha1, keys, args)
-}
-
-func (r *Redis) Exec() ([][]byte, error) {
-	rp, err := r.sendCommand("EXEC")
-	if err != nil {
-		return nil, err
-	}
-	return rp.Multi, nil
 }
 
 func (r *Redis) Exists(key string) (bool, error) {
@@ -610,4 +597,92 @@ func (r *Redis) GetSet(key, value string) (string, error) {
 		return "", err
 	}
 	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) Transaction() (*Transaction, error) {
+	conn, err := r.getConnection()
+	if err != nil {
+		return nil, err
+	}
+	return newTransaction(r, conn)
+}
+
+type Transaction struct {
+	redis *Redis
+	conn  net.Conn
+}
+
+func newTransaction(r *Redis, conn net.Conn) (*Transaction, error) {
+	t := &Transaction{r, conn}
+	err := t.multi()
+	if err != nil {
+		r.activeConnection(conn)
+		return nil, err
+	}
+	return t, nil
+}
+
+func (t *Transaction) multi() error {
+	if err := t.redis.sendConnectionCmd(t.conn, "MULTI"); err != nil {
+		return err
+	}
+	_, err := t.redis.recvConnectionReply(t.conn)
+	return err
+}
+
+func (t *Transaction) Discard() error {
+	if err := t.redis.sendConnectionCmd(t.conn, "DISCARD"); err != nil {
+		return err
+	}
+	_, err := t.redis.recvConnectionReply(t.conn)
+	return err
+}
+
+func (t *Transaction) Watch(keys ...string) error {
+	args := []interface{}{"WATCH"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	if err := t.redis.sendConnectionCmd(t.conn, args...); err != nil {
+		return err
+	}
+	_, err := t.redis.recvConnectionReply(t.conn)
+	return err
+}
+
+func (t *Transaction) UnWatch() error {
+	if err := t.redis.sendConnectionCmd(t.conn, "UNWATCH"); err != nil {
+		return err
+	}
+	_, err := t.redis.recvConnectionReply(t.conn)
+	return err
+}
+
+func (t *Transaction) Exec() ([][]byte, error) {
+	if err := t.redis.sendConnectionCmd(t.conn, "EXEC"); err != nil {
+		return nil, err
+	}
+	rp, err := t.redis.recvConnectionReply(t.conn)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Multi, nil
+}
+
+func (t *Transaction) Close() {
+	t.redis.activeConnection(t.conn)
+}
+
+func (t *Transaction) Command(args ...interface{}) error {
+	if err := t.redis.sendConnectionCmd(t.conn, args...); err != nil {
+		return err
+	}
+	rp, err := t.redis.recvConnectionReply(t.conn)
+	if err != nil {
+		return err
+	}
+	if rp.Status != "QUEUED" {
+		return errors.New(rp.Status)
+	}
+	return nil
 }
