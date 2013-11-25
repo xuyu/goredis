@@ -630,6 +630,315 @@ func (r *Redis) GetSet(key, value string) (string, error) {
 	return r.bulkReturnValue(rp), nil
 }
 
+func (r *Redis) HDel(key string, fields []string) (int64, error) {
+	args := []interface{}{"HDEL", key}
+	for _, field := range fields {
+		args = append(args, field)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) HExists(key, field string) (bool, error) {
+	rp, err := r.sendCommand("HEXISTS", key, field)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) HGet(key, field string) ([]byte, error) {
+	rp, err := r.sendCommand("HGET", key, field)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) HGetAll(key string) ([]string, error) {
+	rp, err := r.sendCommand("HGETALL", key)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) HIncrBy(key, field string, increment int) (int64, error) {
+	rp, err := r.sendCommand("HINCRBY", key, field, increment)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) HIncrByFloat(key, field string, increment float64) (float64, error) {
+	rp, err := r.sendCommand("HINCRBYFLOAT", key, field, increment)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(string(rp.Bulk), 64)
+}
+
+func (r *Redis) HKeys(key string) ([]string, error) {
+	rp, err := r.sendCommand("HKEYS", key)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) HLen(key string) (int64, error) {
+	rp, err := r.sendCommand("HLEN", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) HMGet(key string, fields []string) ([][]byte, error) {
+	args := []interface{}{"HMGET", key}
+	for _, field := range fields {
+		args = append(args, field)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Multi, nil
+}
+
+func (r *Redis) HMSet(key string, pairs map[string]string) error {
+	args := []interface{}{"HMSET", key}
+	for key, value := range pairs {
+		args = append(args, key, value)
+	}
+	rp, err := r.sendCommand(args)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) HSet(key, field, value string) (bool, error) {
+	rp, err := r.sendCommand("HSET", key, field, value)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) HSetnx(key, field, value string) (bool, error) {
+	rp, err := r.sendCommand("HSETNX", key, field, value)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) HVals(key string) ([]string, error) {
+	rp, err := r.sendCommand("HVALS", key)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) Incr(key string) (int64, error) {
+	rp, err := r.sendCommand("INCR", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) IncrBy(key string, increment int) (int64, error) {
+	rp, err := r.sendCommand("INCRBY", key, increment)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) IncrByFloat(key string, increment float64) (float64, error) {
+	rp, err := r.sendCommand("INCRBYFLOAT", key, increment)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(string(rp.Bulk), 64)
+}
+
+func (r *Redis) Info(section string) (string, error) {
+	args := []interface{}{"INFO"}
+	if section != "" {
+		args = append(args, section)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) Keys(pattern string) ([]string, error) {
+	rp, err := r.sendCommand("KEYS", pattern)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) LastSave() (int64, error) {
+	rp, err := r.sendCommand("LASTSAVE")
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LIndex(key string, index int) ([]byte, error) {
+	rp, err := r.sendCommand("LINDEX", key, index)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) LInsertBefore(key, pivot, value string) (int64, error) {
+	rp, err := r.sendCommand("LINSERT", key, "BEFORE", pivot, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LInsertAfter(key, pivot, value string) (int64, error) {
+	rp, err := r.sendCommand("LINSERT", key, "AFTER", pivot, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LLen(key string) (int64, error) {
+	rp, err := r.sendCommand("LLEN", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LPop(key string) ([]byte, error) {
+	rp, err := r.sendCommand("LPOP", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) LPush(key string, values []string) (int64, error) {
+	args := []interface{}{"LPUSH", key}
+	for _, value := range values {
+		args = append(args, value)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LPushx(key, value string) (int64, error) {
+	rp, err := r.sendCommand("LPUSHX", key, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LRange(key string, start, end int) ([]string, error) {
+	rp, err := r.sendCommand("LRANGE", key, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) LRem(key string, count int, value string) (int64, error) {
+	rp, err := r.sendCommand("LREM", key, count, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) LSet(key string, index int, value string) error {
+	rp, err := r.sendCommand("LSET", key, index, value)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) LTrim(key string, start, stop int) error {
+	rp, err := r.sendCommand("LTRIM", key, start, stop)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) MGet(keys []string) ([][]byte, error) {
+	args := []interface{}{"MGET"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Multi, nil
+}
+
+func (r *Redis) Move(key string, db int) (bool, error) {
+	rp, err := r.sendCommand("MOVE", key, db)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) MSet(pairs map[string]string) error {
+	args := []interface{}{"MSET"}
+	for key, value := range pairs {
+		args = append(args, key, value)
+	}
+	_, err := r.sendCommand(args...)
+	return err
+}
+
+func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
+	args := []interface{}{"MSETNX"}
+	for key, value := range pairs {
+		args = append(args, key, value)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) Persist(key string) (bool, error) {
+	rp, err := r.sendCommand("PERSIST", key)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
 func (r *Redis) Transaction() (*Transaction, error) {
 	conn, err := r.getConnection()
 	if err != nil {
