@@ -1,148 +1,147 @@
 package redis
 
 import (
-	"bytes"
 	"testing"
+	"time"
 )
 
-func TestConnect(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+var (
+	network = "tcp"
+	address = "127.0.0.1:6379"
+)
+
+func dial() (*Redis, error) {
+	return DialTimeout(network, address, 0, "", 5*time.Second, 5)
+}
+
+func TestDial(t *testing.T) {
+	_, err := dial()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
-	defer r.Close()
+}
+
+func TestDialFail(t *testing.T) {
+	_, err := DialTimeout(network, "127.0.0.1:63790", 0, "", 5*time.Second, 5)
+	if err == nil {
+		t.Error(err)
+	}
 }
 
 func TestErrorReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	reply, err := r.SendRecv("AUTH", "nopassword")
-	if err != nil {
+	if _, err := r.sendCommand("command_not_exists"); err == nil {
 		t.Fatal(err)
-	}
-	if reply.Type != ErrorReply || reply.Error == nil {
-		t.Error(reply)
 	}
 }
 
 func TestStatusReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	reply, err := r.SendRecv("PING")
+	rp, err := r.sendCommand("PING")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reply.Error != nil || reply.Type != StatusReply {
-		t.Error(reply)
-	}
-	if reply.Status != "PONG" {
-		t.Error(reply.Status)
+	if rp.Type != StatusReply || rp.Status != "PONG" {
+		t.Errorf("%v\n", rp)
 	}
 }
 
 func TestOKReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if err := OK(r.SendRecv("SELECT", 1)); err != nil {
-		t.Error(err)
+	rp, err := r.sendCommand("SAVE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rp.Type != StatusReply || rp.Status != "OK" {
+		t.Errorf("%v\n", rp)
 	}
 }
 
-func TestIntReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+func TestNumberReply(t *testing.T) {
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	reply, err := r.SendRecv("DBSIZE")
+	rp, err := r.sendCommand("DBSIZE")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reply.Error != nil || reply.Type != IntReply {
-		t.Error(reply)
+	if rp.Type != NumberReply {
+		t.Errorf("%v\n", rp)
 	}
 }
 
 func TestBoolReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.SendRecv("SET", "key", "value")
-	if b, err := Bool(r.SendRecv("EXISTS", "key")); err != nil {
-		t.Error(err)
-	} else if !b {
-		t.Error(b)
+	r.sendCommand("SET", "key", "value")
+	rp, err := r.sendCommand("EXISTS", "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rp.Type != NumberReply || rp.Number != 1 {
+		t.Errorf("%v\n", rp)
 	}
 }
 
 func TestBulkReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	reply, err := r.SendRecv("GET", "nokey")
-	if reply.Error != nil {
-		t.Error(reply)
+	rp, err := r.sendCommand("GET", "nokey")
+	if err != nil {
+		t.Error(err)
 	}
-	if reply.Type != BulkReply || reply.Bulk != nil {
-		t.Error(reply)
+	if rp.Type != BulkReply || rp.Bulk != nil {
+		t.Errorf("%v\n", rp)
 	}
-	r.SendRecv("SET", "key", "value")
-	reply, err = r.SendRecv("GET", "key")
-	if reply.Error != nil || reply.Type != BulkReply || reply.Bulk == nil {
-		t.Error(reply)
+	r.sendCommand("SET", "key", "value")
+	rp, err = r.sendCommand("GET", "key")
+	if err != nil {
+		t.Error(err)
 	}
-	if !bytes.Equal(reply.Bulk, []byte("value")) {
-		t.Error(reply)
+	if rp.Type != BulkReply || rp.Bulk == nil {
+		t.Errorf("%v\n", rp)
+	}
+	if string(rp.Bulk) != "value" {
+		t.Errorf("%v\n", rp)
 	}
 }
 
 func TestMultiReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
+	r, err := dial()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.SendRecv("DEL", "key")
-	r.SendRecv("SADD", "key", "value1", "value2", "value3")
-	reply, err := r.SendRecv("SMEMBERS", "key")
+	r.sendCommand("DEL", "key")
+	r.sendCommand("SADD", "key", "value1", "value2", "value3")
+	rp, err := r.sendCommand("SMEMBERS", "key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reply.Error != nil || reply.Type != MultiReply || reply.Multi == nil {
-		t.Error(reply)
+	if rp.Type != MultiReply || rp.Multi == nil {
+		t.Errorf("%v\n", rp)
 	}
-	if len(reply.Multi) != 3 || len(reply.Multi[0]) != 6 {
-		t.Error(reply)
-	}
-}
-
-func TestMapReply(t *testing.T) {
-	r, err := Dial("tcp4", "127.0.0.1:6379")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	r.SendRecv("DEL", "key")
-	r.SendRecv("HSET", "key", "k1", "v1")
-	r.SendRecv("HSET", "key", "k2", "v2")
-	if m, err := Map(r.SendRecv("HGETALL", "key")); err != nil {
-		t.Error(err)
-	} else if len(m) != 2 {
-		t.Error(m)
-	} else if !bytes.Equal(m["k1"], []byte("v1")) {
-		t.Error(m)
+	if len(rp.Multi) != 3 || len(rp.Multi[0]) != 6 {
+		t.Errorf("%v\n", rp)
 	}
 }

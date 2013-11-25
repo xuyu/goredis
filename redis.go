@@ -214,12 +214,11 @@ func (r *Redis) readSize(reader *bufio.Reader, size int) ([]byte, error) {
 }
 
 func (r *Redis) Close() {
-	for {
-		conn, ok := <-r.pool
-		if !ok {
-			break
+	for i := 0; i < r.size; i++ {
+		conn := <-r.pool
+		if conn != nil {
+			conn.Close()
 		}
-		conn.Close()
 	}
 }
 
