@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -68,6 +69,36 @@ func DialTimeout(network, address string, db int, password string, timeout time.
 	}
 	r.activeConnection(conn)
 	return r, nil
+}
+
+func DialURL(rawurl string) (*Redis, error) {
+	ul, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+	if strings.ToLower(ul.Scheme) != "redis" {
+		return nil, errors.New("invalid scheme")
+	}
+	network := "tcp"
+	address := ul.Host
+	db := 0
+	password := ""
+	timeout := 15 * time.Second
+	size := 0
+	path := strings.TrimPrefix(ul.Path, "/")
+	if pw, set := ul.User.Password(); set {
+		password = pw
+	}
+	if number, err := strconv.Atoi(path); err == nil {
+		db = number
+	}
+	if duration, err := time.ParseDuration(ul.Query().Get("timeout")); err == nil {
+		timeout = duration
+	}
+	if number, err := strconv.Atoi(ul.Query().Get("size")); err == nil {
+		size = number
+	}
+	return DialTimeout(network, address, db, password, timeout, size)
 }
 
 func (r *Redis) getConnection() (net.Conn, error) {
