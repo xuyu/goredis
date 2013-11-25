@@ -23,7 +23,7 @@ const (
 	MultiReply
 )
 
-type reply struct {
+type Reply struct {
 	Type   int
 	Status string
 	Number int64
@@ -131,7 +131,7 @@ func (r *Redis) packCommand(args ...interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
+func (r *Redis) recvConnectionReply(conn net.Conn) (*Reply, error) {
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadBytes('\n')
 	if err != nil {
@@ -142,7 +142,7 @@ func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
 	case '-':
 		return nil, errors.New(string(line[1:]))
 	case '+':
-		return &reply{
+		return &Reply{
 			Type:   StatusReply,
 			Status: string(line[1:]),
 		}, nil
@@ -151,7 +151,7 @@ func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &reply{
+		return &Reply{
 			Type:   NumberReply,
 			Number: i,
 		}, nil
@@ -164,7 +164,7 @@ func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &reply{
+		return &Reply{
 			Type: BulkReply,
 			Bulk: bulk,
 		}, nil
@@ -181,7 +181,7 @@ func (r *Redis) recvConnectionReply(conn net.Conn) (*reply, error) {
 			}
 			multi[j] = bulk
 		}
-		return &reply{
+		return &Reply{
 			Type:  MultiReply,
 			Multi: multi,
 		}, nil
@@ -224,7 +224,7 @@ func (r *Redis) Close() {
 	}
 }
 
-func (r *Redis) sendCommand(args ...interface{}) (*reply, error) {
+func (r *Redis) sendCommand(args ...interface{}) (*Reply, error) {
 	conn, err := r.getConnection()
 	defer r.activeConnection(conn)
 	if err != nil {
@@ -242,37 +242,37 @@ func (r *Redis) sendCommand(args ...interface{}) (*reply, error) {
 	return r.recvConnectionReply(conn)
 }
 
-func (r *Redis) integerReturnValue(rp *reply) int64 {
+func (r *Redis) integerReturnValue(rp *Reply) int64 {
 	return rp.Number
 }
 
-func (r *Redis) booleanReturnValue(rp *reply) bool {
+func (r *Redis) booleanReturnValue(rp *Reply) bool {
 	return rp.Number != 0
 }
 
-func (r *Redis) okStatusReturnValue(rp *reply) error {
+func (r *Redis) okStatusReturnValue(rp *Reply) error {
 	if rp.Status == "OK" {
 		return nil
 	}
 	return errors.New(rp.Status)
 }
 
-func (r *Redis) statusReturnValue(rp *reply) string {
+func (r *Redis) statusReturnValue(rp *Reply) string {
 	return rp.Status
 }
 
-func (r *Redis) bulkReturnValue(rp *reply) string {
+func (r *Redis) bulkReturnValue(rp *Reply) string {
 	if rp.Bulk == nil {
 		return ""
 	}
 	return string(rp.Bulk)
 }
 
-func (r *Redis) multiBulkReturnValue(rp *reply) [][]byte {
+func (r *Redis) multiBulkReturnValue(rp *Reply) [][]byte {
 	return rp.Multi
 }
 
-func (r *Redis) hashReturnValue(rp *reply) map[string]string {
+func (r *Redis) hashReturnValue(rp *Reply) map[string]string {
 	if rp.Multi == nil {
 		return nil
 	}
@@ -289,7 +289,7 @@ func (r *Redis) hashReturnValue(rp *reply) map[string]string {
 	return result
 }
 
-func (r *Redis) listReturnValue(rp *reply) []string {
+func (r *Redis) listReturnValue(rp *Reply) []string {
 	if rp.Multi == nil {
 		return nil
 	}
@@ -517,7 +517,7 @@ func (r *Redis) Echo(message string) (string, error) {
 	return r.bulkReturnValue(rp), nil
 }
 
-func (r *Redis) Eval(script string, keys []string, args []string) (*reply, error) {
+func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
 	cmds := []interface{}{"EVAL", script, len(keys)}
 	for _, key := range keys {
 		cmds = append(cmds, key)
@@ -528,7 +528,7 @@ func (r *Redis) Eval(script string, keys []string, args []string) (*reply, error
 	return r.sendCommand(cmds...)
 }
 
-func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*reply, error) {
+func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*Reply, error) {
 	return r.Eval(sha1, keys, args)
 }
 
