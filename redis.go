@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
@@ -229,6 +230,12 @@ func (r *Redis) sendCommand(args ...interface{}) (*reply, error) {
 		return nil, err
 	}
 	if err := r.sendConnectionCmd(conn, args...); err != nil {
+		if err == io.EOF {
+			conn, err = r.openConnection()
+			if err != nil {
+				return nil, err
+			}
+		}
 		return nil, err
 	}
 	return r.recvConnectionReply(conn)
