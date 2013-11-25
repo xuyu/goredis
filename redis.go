@@ -608,12 +608,16 @@ func (r *Redis) Transaction() (*Transaction, error) {
 }
 
 type Transaction struct {
-	redis *Redis
-	conn  net.Conn
+	redis  *Redis
+	conn   net.Conn
+	queued int
 }
 
 func newTransaction(r *Redis, conn net.Conn) (*Transaction, error) {
-	t := &Transaction{r, conn}
+	t := &Transaction{
+		redis: r,
+		conn:  conn,
+	}
 	err := t.multi()
 	if err != nil {
 		r.activeConnection(conn)
@@ -658,15 +662,20 @@ func (t *Transaction) UnWatch() error {
 	return err
 }
 
-func (t *Transaction) Exec() ([][]byte, error) {
+func (t *Transaction) Exec() ([]interface{}, error) {
 	if err := t.redis.sendConnectionCmd(t.conn, "EXEC"); err != nil {
 		return nil, err
 	}
-	rp, err := t.redis.recvConnectionReply(t.conn)
-	if err != nil {
-		return nil, err
+	result := make([]interface{}, t.queued)
+	for i := 0; i < t.queued; i++ {
+		rp, err := t.redis.recvConnectionReply(t.conn)
+		if err != nil {
+			result = append(result, err)
+		} else {
+			result = append(result, rp)
+		}
 	}
-	return rp.Multi, nil
+	return result, nil
 }
 
 func (t *Transaction) Close() {
@@ -684,5 +693,6 @@ func (t *Transaction) Command(args ...interface{}) error {
 	if rp.Status != "QUEUED" {
 		return errors.New(rp.Status)
 	}
+	t.queued++
 	return nil
 }
