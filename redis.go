@@ -939,6 +939,304 @@ func (r *Redis) Persist(key string) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
+func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
+	rp, err := r.sendCommand("PEXPIRE", key, milliseconds)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
+	rp, err := r.sendCommand("PEXPIREAT", key, timestamp)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) Ping() error {
+	rp, err := r.sendCommand("PING")
+	if err != nil {
+		return err
+	}
+	if rp.Status != "PONG" {
+		return errors.New(rp.Status)
+	}
+	return nil
+}
+
+func (r *Redis) PSetex(key string, milliseconds int, value string) error {
+	_, err := r.sendCommand("PSETEX", key, milliseconds, value)
+	return err
+}
+
+func (r *Redis) PTTL(key string) (int64, error) {
+	rp, err := r.sendCommand("PTTL", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Quit() error {
+	_, err := r.sendCommand("QUIT")
+	return err
+}
+
+func (r *Redis) RandomKey() ([]byte, error) {
+	rp, err := r.sendCommand("RANDOMKEY")
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) Rename(key, newkey string) error {
+	rp, err := r.sendCommand("RENAME", key, newkey)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) Renamenx(key, newkey string) (bool, error) {
+	rp, err := r.sendCommand("RENAMENX", key, newkey)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) Restore(key string, ttl int, serialized []byte) error {
+	rp, err := r.sendCommand("RESTORE", key, ttl, serialized)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) RPop(key string) ([]byte, error) {
+	rp, err := r.sendCommand("RPOP", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
+	rp, err := r.sendCommand("RPOPLPUSH", source, destination)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) RPush(key string, values []string) (int64, error) {
+	args := []interface{}{"RPUSH", key}
+	for _, value := range values {
+		args = append(args, value)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) RPushx(key, value string) (int64, error) {
+	rp, err := r.sendCommand("RPUSHX", key, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) SAdd(key string, members []string) (int64, error) {
+	args := []interface{}{"SADD", key}
+	for _, member := range members {
+		args = append(args, member)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Save() error {
+	rp, err := r.sendCommand("SAVE")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) SCard(key string) (int64, error) {
+	rp, err := r.sendCommand("SCARD", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
+	args := []interface{}{"SCRIPT", "EXISTS"}
+	for _, script := range scripts {
+		args = append(args, script)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	var result []bool
+	for _, item := range rp.Multi {
+		n, err := strconv.Atoi(string(item))
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, n != 0)
+	}
+	return result, nil
+}
+
+func (r *Redis) ScriptFlush() error {
+	rp, err := r.sendCommand("SCRIPT", "FLUSH")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ScriptKill() error {
+	rp, err := r.sendCommand("SCRIPT", "KILL")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ScriptLoad(script string) (string, error) {
+	rp, err := r.sendCommand("SCRIPT", "LOAD", script)
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) SDiff(keys ...string) ([]string, error) {
+	args := []interface{}{"SDIFF"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, must_not_exists bool) error {
+	args := []interface{}{"SET", key, value}
+	if seconds > 0 {
+		args = append(args, "EX", seconds)
+	}
+	if milliseconds > 0 {
+		args = append(args, "PX", milliseconds)
+	}
+	if must_exists {
+		args = append(args, "XX")
+	} else if must_not_exists {
+		args = append(args, "NX")
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
+	rp, err := r.sendCommand("SETBIT", key, offset, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Setex(key string, seconds int, value string) error {
+	rp, err := r.sendCommand("SETEX", key, seconds, value)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) SetRange(key string, offset int, value string) (int64, error) {
+	rp, err := r.sendCommand("SETRANGE", key, offset, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Shutdown(save, no_save bool) error {
+	args := []interface{}{"SHUTDOWN"}
+	if save {
+		args = append(args, "SAVE")
+	} else if no_save {
+		args = append(args, "NOSAVE")
+	}
+	rp, err := r.sendCommand(args...)
+	if err == io.EOF {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return errors.New(rp.Status)
+}
+
+func (r *Redis) SInter(keys ...string) ([]string, error) {
+	args := []interface{}{"SINTER"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
+	args := []interface{}{"SINTERSTORE", destination}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) SIsMember(key, member string) (bool, error) {
+	rp, err := r.sendCommand("SISMEMBER", key, member)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) SlaveOf(host, port string) error {
+	rp, err := r.sendCommand("SLAVEOF", host, port)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
 func (r *Redis) Transaction() (*Transaction, error) {
 	conn, err := r.getConnection()
 	if err != nil {
