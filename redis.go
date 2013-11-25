@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -239,4 +240,374 @@ func (r *Redis) sendCommand(args ...interface{}) (*reply, error) {
 		return nil, err
 	}
 	return r.recvConnectionReply(conn)
+}
+
+func (r *Redis) integerReturnValue(rp *reply) int64 {
+	return rp.Number
+}
+
+func (r *Redis) booleanReturnValue(rp *reply) bool {
+	return rp.Number != 0
+}
+
+func (r *Redis) okStatusReturnValue(rp *reply) error {
+	if rp.Status == "OK" {
+		return nil
+	}
+	return errors.New(rp.Status)
+}
+
+func (r *Redis) statusReturnValue(rp *reply) string {
+	return rp.Status
+}
+
+func (r *Redis) bulkReturnValue(rp *reply) string {
+	if rp.Bulk == nil {
+		return ""
+	}
+	return string(rp.Bulk)
+}
+
+func (r *Redis) multiBulkReturnValue(rp *reply) [][]byte {
+	return rp.Multi
+}
+
+func (r *Redis) hashReturnValue(rp *reply) map[string]string {
+	if rp.Multi == nil {
+		return nil
+	}
+	result := make(map[string]string)
+	length := len(rp.Multi)
+	for i := 0; i < length/2; i++ {
+		var key, value string
+		key = string(rp.Multi[i*2])
+		if rp.Multi[i*2+1] != nil {
+			value = string(rp.Multi[i*2+1])
+		}
+		result[key] = value
+	}
+	return result
+}
+
+func (r *Redis) listReturnValue(rp *reply) []string {
+	if rp.Multi == nil {
+		return nil
+	}
+	var result []string
+	for _, item := range rp.Multi {
+		if item == nil {
+			result = append(result, "")
+		} else {
+			result = append(result, string(item))
+		}
+	}
+	return result
+}
+
+func (r *Redis) Append(key, value string) (int64, error) {
+	rp, err := r.sendCommand("APPEND", key, value)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Auth(password string) error {
+	rp, err := r.sendCommand("AUTH", password)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) BgRewriteAof() error {
+	_, err := r.sendCommand("BGREWRITEAOF")
+	return err
+}
+
+func (r *Redis) BgSave() error {
+	_, err := r.sendCommand("BGSAVE")
+	return err
+}
+
+func (r *Redis) BitCount(key, start, end string) (int64, error) {
+	rp, err := r.sendCommand("BITCOUNT", key, start, end)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) {
+	args := []interface{}{"BITOP", operation, destkey}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) BLPop(keys []string, timeout int) (string, string, error) {
+	args := []interface{}{"BLPOP"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	args = append(args, timeout)
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return "", "", err
+	}
+	return string(rp.Multi[0]), string(rp.Multi[1]), nil
+}
+
+func (r *Redis) BRPop(keys []string, timeout int) (string, string, error) {
+	args := []interface{}{"BRPOP"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	args = append(args, timeout)
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return "", "", err
+	}
+	return string(rp.Multi[0]), string(rp.Multi[1]), nil
+}
+
+func (r *Redis) BRPopLPush(source, destination string, timeout int) (string, error) {
+	args := []interface{}{"BRPOPLPUSH", source, destination, timeout}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return "", err
+	}
+	if rp.Type == MultiReply {
+		return "", nil
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) ClientKill(ip string, port int) error {
+	arg := net.JoinHostPort(ip, strconv.Itoa(port))
+	rp, err := r.sendCommand("CLIENT", "KILL", arg)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ClientList() ([]map[string]string, error) {
+	rp, err := r.sendCommand("CLIENT", "LIST")
+	if err != nil {
+		return nil, err
+	}
+	var result []map[string]string
+	bulk := string(r.bulkReturnValue(rp))
+	for _, line := range strings.Split(bulk, "\n") {
+		item := make(map[string]string)
+		for _, field := range strings.Fields(line) {
+			val := strings.Split(field, "=")
+			item[val[0]] = val[1]
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func (r *Redis) ClientGetName() (string, error) {
+	rp, err := r.sendCommand("CLIENT", "GETNAME")
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) ClientSetName(name string) error {
+	rp, err := r.sendCommand("CLIENT", "SETNAME", name)
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ConfigGet(parameter string) (map[string]string, error) {
+	rp, err := r.sendCommand("CONFIG", "GET", parameter)
+	if err != nil {
+		return nil, err
+	}
+	return r.hashReturnValue(rp), nil
+}
+
+func (r *Redis) ConfigRewrite() error {
+	rp, err := r.sendCommand("CONFIG", "REWRITE")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ConfigSet(parameter, value string) error {
+	rp, err := r.sendCommand("CONFIG", "SET")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) ConfigResetStat() error {
+	_, err := r.sendCommand("CONFIG", "RESETSTAT")
+	return err
+}
+
+func (r *Redis) DBSize() (int64, error) {
+	rp, err := r.sendCommand("DBSIZE")
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Decr(key string) (int64, error) {
+	rp, err := r.sendCommand("DECR", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) DecrBy(key string, decrement int) (int64, error) {
+	rp, err := r.sendCommand("DECRBY", key, decrement)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Del(keys ...string) (int64, error) {
+	args := []interface{}{"DEL"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Discard() error {
+	_, err := r.sendCommand("DISCARD")
+	return err
+}
+
+func (r *Redis) Dump(key string) ([]byte, error) {
+	rp, err := r.sendCommand("DUMP", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) Echo(message string) (string, error) {
+	rp, err := r.sendCommand("ECHO", message)
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) Eval(script string, keys []string, args []string) (*reply, error) {
+	cmds := []interface{}{"EVAL", script, len(keys)}
+	for _, key := range keys {
+		cmds = append(cmds, key)
+	}
+	for _, arg := range args {
+		cmds = append(cmds, arg)
+	}
+	return r.sendCommand(cmds...)
+}
+
+func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*reply, error) {
+	return r.Eval(sha1, keys, args)
+}
+
+func (r *Redis) Exec() ([][]byte, error) {
+	rp, err := r.sendCommand("EXEC")
+	if err != nil {
+		return nil, err
+	}
+	return rp.Multi, nil
+}
+
+func (r *Redis) Exists(key string) (bool, error) {
+	rp, err := r.sendCommand("EXISTS", key)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) Expire(key string, seconds int) (bool, error) {
+	rp, err := r.sendCommand("EXPIRE", key, seconds)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) ExpireAt(key string, timestamp int64) (bool, error) {
+	rp, err := r.sendCommand("EXPIREAT", key, timestamp)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) FlushAll() error {
+	rp, err := r.sendCommand("FLUSHALL")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) FlushDB() error {
+	rp, err := r.sendCommand("FLUSHDB")
+	if err != nil {
+		return err
+	}
+	return r.okStatusReturnValue(rp)
+}
+
+func (r *Redis) Get(key string) ([]byte, error) {
+	rp, err := r.sendCommand("GET", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) GetBit(key string, offset int) (int64, error) {
+	rp, err := r.sendCommand("GETBIT", key, offset)
+	if err != nil {
+		return 0, err
+	}
+	return rp.Number, nil
+}
+
+func (r *Redis) GetRange(key string, start, end int) (string, error) {
+	rp, err := r.sendCommand("GETRANGE", start, end)
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
+}
+
+func (r *Redis) GetSet(key, value string) (string, error) {
+	rp, err := r.sendCommand("GETSET", key, value)
+	if err != nil {
+		return "", err
+	}
+	return r.bulkReturnValue(rp), nil
 }
