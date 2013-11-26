@@ -1637,6 +1637,7 @@ func (r *Redis) SlaveOf(host, port string) error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Returns all the members of the set value stored at key.
 func (r *Redis) SMembers(key string) ([]string, error) {
 	rp, err := r.sendCommand("SMEMBERS", key)
 	if err != nil {
@@ -1645,6 +1646,8 @@ func (r *Redis) SMembers(key string) ([]string, error) {
 	return r.listReturnValue(rp)
 }
 
+// Move member from the set at source to the set at destination. This operation is atomic.
+// In every given moment the element will appear to be a member of source or destination for other clients.
 func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	rp, err := r.sendCommand("SMOVE", source, destination, member)
 	if err != nil {
@@ -1653,6 +1656,12 @@ func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	return r.booleanReturnValue(rp)
 }
 
+/*
+SORT key [BY pattern] [LIMIT offset count] [GET pattern [GET pattern ...]] [ASC|DESC] [ALPHA] [STORE destination]
+*/
+
+// Removes and returns a random element from the set value stored at key.
+// Bulk reply: the removed element, or nil when key does not exist.
 func (r *Redis) SPop(key string) ([]byte, error) {
 	rp, err := r.sendCommand("SPOP", key)
 	if err != nil {
@@ -1661,6 +1670,8 @@ func (r *Redis) SPop(key string) ([]byte, error) {
 	return r.bytesBulkReturnValue(rp)
 }
 
+// When called with just the key argument, return a random element from the set value stored at key.
+// Bulk reply: the command returns a Bulk Reply with the randomly selected element, or nil when key does not exist.
 func (r *Redis) SRandMember(key string) ([]byte, error) {
 	rp, err := r.sendCommand("SRANDMEMBER", key)
 	if err != nil {
@@ -1669,6 +1680,10 @@ func (r *Redis) SRandMember(key string) ([]byte, error) {
 	return r.bytesBulkReturnValue(rp)
 }
 
+// return an array of count distinct elements if count is positive.
+// If called with a negative count the behavior changes and the command is allowed to return the same element multiple times.
+// In this case the numer of returned elements is the absolute value of the specified count.
+// returns an array of elements, or an empty array when key does not exist.
 func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
 	rp, err := r.sendCommand("SRANDMEMBER", key, count)
 	if err != nil {
@@ -1677,6 +1692,11 @@ func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
 	return r.bytesArrayReturnValue(rp)
 }
 
+// Remove the specified members from the set stored at key.
+// Specified members that are not a member of this set are ignored.
+// If key does not exist, it is treated as an empty set and this command returns 0.
+// An error is returned when the value stored at key is not a set.
+// Integer reply: the number of members that were removed from the set, not including non existing members.
 func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	args := packArgs("SREM", key, members)
 	rp, err := r.sendCommand(args...)
@@ -1686,6 +1706,9 @@ func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Returns the length of the string value stored at key.
+// An error is returned when key holds a non-string value.
+// Integer reply: the length of the string at key, or 0 when key does not exist.
 func (r *Redis) StrLen(key string) (int64, error) {
 	rp, err := r.sendCommand("STRLEN", key)
 	if err != nil {
@@ -1694,6 +1717,8 @@ func (r *Redis) StrLen(key string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Returns the members of the set resulting from the union of all the given sets.
+// Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	args := packArgs("SUNION", keys)
 	rp, err := r.sendCommand(args...)
@@ -1703,6 +1728,8 @@ func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	return r.listReturnValue(rp)
 }
 
+// If destination already exists, it is overwritten.
+// Integer reply: the number of elements in the resulting set.
 func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 	args := packArgs("SUNIONSTORE", destination, keys)
 	rp, err := r.sendCommand(args...)
@@ -1712,6 +1739,13 @@ func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+/*
+SYNC
+*/
+
+// A multi bulk reply containing two elements:
+// unix time in seconds.
+// microseconds.
 func (r *Redis) Time() ([]string, error) {
 	rp, err := r.sendCommand("TIME")
 	if err != nil {
@@ -1720,6 +1754,8 @@ func (r *Redis) Time() ([]string, error) {
 	return r.listReturnValue(rp)
 }
 
+// Returns the remaining time to live of a key that has a timeout.
+// Integer reply: TTL in seconds, or a negative value in order to signal an error (see the description above).
 func (r *Redis) TTL(key string) (int64, error) {
 	rp, err := r.sendCommand("TTL", key)
 	if err != nil {
@@ -1728,6 +1764,9 @@ func (r *Redis) TTL(key string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Returns the string representation of the type of the value stored at key.
+// The different types that can be returned are: string, list, set, zset and hash.
+// Status code reply: type of key, or none when key does not exist.
 func (r *Redis) Type(key string) (string, error) {
 	rp, err := r.sendCommand("TYPE", key)
 	if err != nil {
@@ -1736,6 +1775,14 @@ func (r *Redis) Type(key string) (string, error) {
 	return r.statusReturnValue(rp)
 }
 
+// Adds all the specified members with the specified scores to the sorted set stored at key.
+// If a specified member is already a member of the sorted set,
+// the score is updated and the element reinserted at the right position to ensure the correct ordering.
+// If key does not exist, a new sorted set with the specified members as sole members is created,
+// like if the sorted set was empty.
+// If the key exists but does not hold a sorted set, an error is returned.
+// Return value:
+// The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
 func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
 	args := packArgs("ZADD", key, pairs)
 	rp, err := r.sendCommand(args...)
@@ -1745,6 +1792,8 @@ func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
+// Integer reply: the cardinality (number of elements) of the sorted set, or 0 if key does not exist.
 func (r *Redis) ZCard(key string) (int64, error) {
 	rp, err := r.sendCommand("ZCARD", key)
 	if err != nil {
@@ -1753,6 +1802,9 @@ func (r *Redis) ZCard(key string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Returns the number of elements in the sorted set at key with a score between min and max.
+// The min and max arguments have the same semantic as described for ZRANGEBYSCORE.
+// Integer reply: the number of elements in the specified score range.
 func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
 	rp, err := r.sendCommand("ZCOUNT", key, min, max)
 	if err != nil {
@@ -1761,6 +1813,12 @@ func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Increments the score of member in the sorted set stored at key by increment.
+// If member does not exist in the sorted set, it is added with increment as its score
+// (as if its previous score was 0.0).
+// If key does not exist, a new sorted set with the specified member as its sole member is created.
+// An error is returned when key exists but does not hold a sorted set.
+// Bulk reply: the new score of member (a double precision floating point number), represented as string.
 func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, error) {
 	rp, err := r.sendCommand("ZINCRBY", key, increment, member)
 	if err != nil {
@@ -1777,6 +1835,89 @@ func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, 
 	return float32(score), nil
 }
 
+/*
+ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+*/
+
+/*
+ZRANGE key start stop [WITHSCORES]
+*/
+
+/*
+ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+*/
+
+/*
+ZRANK key member
+*/
+
+// Removes the specified members from the sorted set stored at key. Non existing members are ignored.
+// An error is returned when key exists and does not hold a sorted set.
+// Integer reply, specifically:
+// The number of members removed from the sorted set, not including non existing members.
+func (r *Redis) ZRem(key string, members ...string) (int64, error) {
+	args := packArgs("ZREM", key, members)
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp)
+}
+
+// Removes all elements in the sorted set stored at key with rank between start and stop.
+// Both start and stop are 0 -based indexes with 0 being the element with the lowest score.
+// These indexes can be negative numbers, where they indicate offsets starting at the element with the highest score.
+// For example: -1 is the element with the highest score, -2 the element with the second highest score and so forth.
+// Integer reply: the number of elements removed.
+func (r *Redis) ZRemRangeByRank(key string, start, stop int) (int64, error) {
+	rp, err := r.sendCommand("ZREMRANGEBYRANK", key, start, stop)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp)
+}
+
+// Removes all elements in the sorted set stored at key with a score between min and max (inclusive).
+// Integer reply: the number of elements removed.
+func (r *Redis) ZRemRangeByScore(key string, min, max int) (int64, error) {
+	rp, err := r.sendCommand("ZREMRANGEBYSCORE", key, min, max)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp)
+}
+
+/*
+ZREVRANGE key start stop [WITHSCORES]
+*/
+
+// Returns the score of member in the sorted set at key.
+// If member does not exist in the sorted set, or key does not exist, nil is returned.
+// Bulk reply: the score of member (a double precision floating point number), represented as string.
+func (r *Redis) ZScore(key, member string) ([]byte, error) {
+	rp, err := r.sendCommand("ZSCORE", key, member)
+	if err != nil {
+		return 0.0, err
+	}
+	return r.bytesBulkReturnValue(rp)
+}
+
+/*
+ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+*/
+
+/*
+SCAN cursor [MATCH pattern] [COUNT count]
+SSCAN key cursor [MATCH pattern] [COUNT count]
+SCAN key cursor [MATCH pattern] [COUNT count]
+ZSCAN key cursor [MATCH pattern] [COUNT count]
+*/
+
+// Document: http://redis.io/topics/transactions
+// MULTI, EXEC, DISCARD and WATCH are the foundation of transactions in Redis.
+// A Redis script is transactional by definition,
+// so everything you can do with a Redis transaction, you can also do with a script,
+// and usually the script will be both simpler and faster.
 func (r *Redis) Transaction() (*Transaction, error) {
 	c, err := r.getConnection()
 	if err != nil {
