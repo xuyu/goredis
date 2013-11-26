@@ -33,7 +33,6 @@ func TestErrorReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	if _, err := r.sendCommand("command_not_exists"); err == nil {
 		t.Fatal(err)
 	}
@@ -44,7 +43,6 @@ func TestStatusReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	rp, err := r.sendCommand("PING")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +57,6 @@ func TestOKReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	rp, err := r.sendCommand("SAVE")
 	if err != nil {
 		t.Fatal(err)
@@ -74,12 +71,11 @@ func TestNumberReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	rp, err := r.sendCommand("DBSIZE")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.Type != NumberReply {
+	if rp.Type != IntegerReply {
 		t.Errorf("%v\n", rp)
 	}
 }
@@ -89,13 +85,12 @@ func TestBoolReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	r.sendCommand("SET", "key", "value")
 	rp, err := r.sendCommand("EXISTS", "key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rp.Type != NumberReply || rp.Number != 1 {
+	if rp.Type != IntegerReply || rp.Integer != 1 {
 		t.Errorf("%v\n", rp)
 	}
 }
@@ -105,7 +100,6 @@ func TestBulkReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	rp, err := r.sendCommand("GET", "nokey")
 	if err != nil {
 		t.Error(err)
@@ -131,7 +125,6 @@ func TestMultiReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
 	r.sendCommand("DEL", "key")
 	r.sendCommand("SADD", "key", "value1", "value2", "value3")
 	rp, err := r.sendCommand("SMEMBERS", "key")
@@ -143,5 +136,39 @@ func TestMultiReply(t *testing.T) {
 	}
 	if len(rp.Multi) != 3 || len(rp.Multi[0]) != 6 {
 		t.Errorf("%v\n", rp)
+	}
+}
+
+func TestDiaURL(t *testing.T) {
+	rawurl := "redis://127.0.0.1:6379/1?size=5&timeout=10s"
+	r, err := DialURL(rawurl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.db != 1 || r.size != 5 || r.timeout != 10*time.Second {
+		t.Fail()
+	}
+}
+
+func TestDialURLFail(t *testing.T) {
+	rawurl := "redis://tester:password@127.0.0.1:6379/1"
+	_, err := DialURL(rawurl)
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestAuth(t *testing.T) {
+	r, _ := dial()
+	if err := r.Auth("password"); err == nil {
+		t.Fail()
+	}
+}
+
+func TestClientList(t *testing.T) {
+	r, _ := dial()
+	_, err := r.ClientList()
+	if err != nil {
+		t.Error(err)
 	}
 }
