@@ -763,6 +763,16 @@ func (r *Redis) Echo(message string) (string, error) {
 	return r.stringBulkReturnValue(rp)
 }
 
+func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
+	cmds := packArgs("EVAL", script, len(keys), keys, args)
+	return r.sendCommand(cmds...)
+}
+
+func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*Reply, error) {
+	cmds := packArgs("EVALSHA", sha1, len(keys), keys, args)
+	return r.sendCommand(cmds...)
+}
+
 func (r *Redis) Exists(key string) (bool, error) {
 	rp, err := r.sendCommand("EXISTS", key)
 	if err != nil {
@@ -1897,7 +1907,7 @@ ZREVRANGE key start stop [WITHSCORES]
 func (r *Redis) ZScore(key, member string) ([]byte, error) {
 	rp, err := r.sendCommand("ZSCORE", key, member)
 	if err != nil {
-		return 0.0, err
+		return nil, err
 	}
 	return r.bytesBulkReturnValue(rp)
 }
