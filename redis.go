@@ -1237,6 +1237,162 @@ func (r *Redis) SlaveOf(host, port string) error {
 	return r.okStatusReturnValue(rp)
 }
 
+func (r *Redis) SMembers(key string) ([]string, error) {
+	rp, err := r.sendCommand("SMEMBERS", key)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) SMove(source, destination, member string) (bool, error) {
+	rp, err := r.sendCommand("SMOVE", source, destination, member)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+func (r *Redis) SPop(key string) ([]byte, error) {
+	rp, err := r.sendCommand("SPOP", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) SRandMember(key string) ([]byte, error) {
+	rp, err := r.sendCommand("SRANDMEMBER", key)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Bulk, nil
+}
+
+func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
+	rp, err := r.sendCommand("SRANDMEMBER", key, count)
+	if err != nil {
+		return nil, err
+	}
+	return rp.Multi, nil
+}
+
+func (r *Redis) SRem(key string, members []string) (int64, error) {
+	args := []interface{}{"SREM", key}
+	for _, member := range members {
+		args = append(args, member)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) StrLen(key string) (int64, error) {
+	rp, err := r.sendCommand("STRLEN", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) SUnion(keys ...string) ([]string, error) {
+	args := []interface{}{"SUNION"}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return r.listReturnValue(rp), nil
+}
+
+func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
+	args := []interface{}{"SUNIONSTORE", destination}
+	for _, key := range keys {
+		args = append(args, key)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Time() (int, int, error) {
+	rp, err := r.sendCommand("TIME")
+	if err != nil {
+		return 0, 0, err
+	}
+	seconds, err := strconv.Atoi(string(rp.Multi[0]))
+	if err != nil {
+		return 0, 0, err
+	}
+	microseconds, err := strconv.Atoi(string(rp.Multi[1]))
+	if err != nil {
+		return 0, 0, err
+	}
+	return seconds, microseconds, nil
+}
+
+func (r *Redis) TTL(key string) (int64, error) {
+	rp, err := r.sendCommand("TTL", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) Type(key string) (string, error) {
+	rp, err := r.sendCommand("TYPE", key)
+	if err != nil {
+		return "", err
+	}
+	return r.statusReturnValue(rp), nil
+}
+
+func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
+	args := []interface{}{"ZADD", key}
+	for score, member := range pairs {
+		args = append(args, score, member)
+	}
+	rp, err := r.sendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) ZCard(key string) (int64, error) {
+	rp, err := r.sendCommand("ZCARD", key)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
+	rp, err := r.sendCommand("ZCOUNT", key, min, max)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp), nil
+}
+
+func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, error) {
+	rp, err := r.sendCommand("ZINCRBY", key, increment, member)
+	if err != nil {
+		return 0.0, err
+	}
+	score, err := strconv.ParseFloat(string(rp.Bulk), 32)
+	if err != nil {
+		return 0.0, err
+	}
+	return float32(score), nil
+}
+
 func (r *Redis) Transaction() (*Transaction, error) {
 	conn, err := r.getConnection()
 	if err != nil {
