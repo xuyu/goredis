@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -162,6 +163,34 @@ func (r *Redis) packCommand(args ...interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (r *Redis) packArgs(items ...interface{}) (args []interface{}) {
+	for _, item := range items {
+		v := reflect.ValueOf(item)
+		switch v.Kind() {
+		case reflect.Slice:
+			if v.Elem().Kind() == reflect.Uint8 {
+				args = append(args, string(v.Bytes()))
+			} else {
+				for i := 0; i < v.Len(); i++ {
+					args = append(args, v.Index(i).Interface())
+				}
+			}
+		case reflect.Map:
+			for _, key := range v.MapKeys() {
+				value := v.MapIndex(key)
+				args = append(args, key.Interface(), value.Interface())
+			}
+		case reflect.String:
+			if v.String() != "" {
+				args = append(args, v.Interface())
+			}
+		default:
+			args = append(args, v.Interface())
+		}
+	}
+	return args
+}
+
 func (r *Redis) recvConnectionReply(conn net.Conn) (*Reply, error) {
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadBytes('\n')
@@ -288,19 +317,11 @@ func (r *Redis) okStatusReturnValue(rp *Reply) error {
 	return errors.New(rp.Status)
 }
 
-func (r *Redis) statusReturnValue(rp *Reply) string {
-	return rp.Status
-}
-
-func (r *Redis) bulkReturnValue(rp *Reply) string {
+func (r *Redis) stringBulkReturnValue(rp *Reply) string {
 	if rp.Bulk == nil {
 		return ""
 	}
 	return string(rp.Bulk)
-}
-
-func (r *Redis) multiBulkReturnValue(rp *Reply) [][]byte {
-	return rp.Multi
 }
 
 func (r *Redis) hashReturnValue(rp *Reply) map[string]string {
@@ -370,10 +391,7 @@ func (r *Redis) BitCount(key, start, end string) (int64, error) {
 }
 
 func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) {
-	args := []interface{}{"BITOP", operation, destkey}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("BITOP", operation, destkey, keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -382,11 +400,7 @@ func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) 
 }
 
 func (r *Redis) BLPop(keys []string, timeout int) (string, string, error) {
-	args := []interface{}{"BLPOP"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
-	args = append(args, timeout)
+	args := r.packArgs("BLPOP", keys, timeout)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return "", "", err
@@ -395,11 +409,7 @@ func (r *Redis) BLPop(keys []string, timeout int) (string, string, error) {
 }
 
 func (r *Redis) BRPop(keys []string, timeout int) (string, string, error) {
-	args := []interface{}{"BRPOP"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
-	args = append(args, timeout)
+	args := r.packArgs("BRPOP", keys, timeout)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return "", "", err
@@ -408,20 +418,18 @@ func (r *Redis) BRPop(keys []string, timeout int) (string, string, error) {
 }
 
 func (r *Redis) BRPopLPush(source, destination string, timeout int) (string, error) {
-	args := []interface{}{"BRPOPLPUSH", source, destination, timeout}
-	rp, err := r.sendCommand(args...)
+	rp, err := r.sendCommand("BRPOPLPUSH", source, destination, timeout)
 	if err != nil {
 		return "", err
 	}
 	if rp.Type == MultiReply {
 		return "", nil
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) ClientKill(ip string, port int) error {
-	arg := net.JoinHostPort(ip, strconv.Itoa(port))
-	rp, err := r.sendCommand("CLIENT", "KILL", arg)
+	rp, err := r.sendCommand("CLIENT", "KILL", net.JoinHostPort(ip, strconv.Itoa(port)))
 	if err != nil {
 		return err
 	}
@@ -434,7 +442,7 @@ func (r *Redis) ClientList() ([]map[string]string, error) {
 		return nil, err
 	}
 	var result []map[string]string
-	bulk := string(r.bulkReturnValue(rp))
+	bulk := r.stringBulkReturnValue(rp)
 	for _, line := range strings.Split(bulk, "\n") {
 		item := make(map[string]string)
 		for _, field := range strings.Fields(line) {
@@ -451,7 +459,7 @@ func (r *Redis) ClientGetName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) ClientSetName(name string) error {
@@ -516,10 +524,7 @@ func (r *Redis) DecrBy(key string, decrement int) (int64, error) {
 }
 
 func (r *Redis) Del(keys ...string) (int64, error) {
-	args := []interface{}{"DEL"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("DEL", keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -540,17 +545,11 @@ func (r *Redis) Echo(message string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
-	cmds := []interface{}{"EVAL", script, len(keys)}
-	for _, key := range keys {
-		cmds = append(cmds, key)
-	}
-	for _, arg := range args {
-		cmds = append(cmds, arg)
-	}
+	cmds := r.packArgs("EVAL", script, len(keys), keys, args)
 	return r.sendCommand(cmds...)
 }
 
@@ -619,7 +618,7 @@ func (r *Redis) GetRange(key string, start, end int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) GetSet(key, value string) (string, error) {
@@ -627,14 +626,11 @@ func (r *Redis) GetSet(key, value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
-func (r *Redis) HDel(key string, fields []string) (int64, error) {
-	args := []interface{}{"HDEL", key}
-	for _, field := range fields {
-		args = append(args, field)
-	}
+func (r *Redis) HDel(key string, fields ...string) (int64, error) {
+	args := r.packArgs("HDEL", key, fields)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -698,11 +694,8 @@ func (r *Redis) HLen(key string) (int64, error) {
 	return r.integerReturnValue(rp), nil
 }
 
-func (r *Redis) HMGet(key string, fields []string) ([][]byte, error) {
-	args := []interface{}{"HMGET", key}
-	for _, field := range fields {
-		args = append(args, field)
-	}
+func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
+	args := r.packArgs("HMGET", key, fields)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -711,10 +704,7 @@ func (r *Redis) HMGet(key string, fields []string) ([][]byte, error) {
 }
 
 func (r *Redis) HMSet(key string, pairs map[string]string) error {
-	args := []interface{}{"HMSET", key}
-	for key, value := range pairs {
-		args = append(args, key, value)
-	}
+	args := r.packArgs("HMSET", key, pairs)
 	rp, err := r.sendCommand(args)
 	if err != nil {
 		return err
@@ -771,15 +761,12 @@ func (r *Redis) IncrByFloat(key string, increment float64) (float64, error) {
 }
 
 func (r *Redis) Info(section string) (string, error) {
-	args := []interface{}{"INFO"}
-	if section != "" {
-		args = append(args, section)
-	}
+	args := r.packArgs("INFO", section)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) Keys(pattern string) ([]string, error) {
@@ -838,11 +825,8 @@ func (r *Redis) LPop(key string) ([]byte, error) {
 	return rp.Bulk, nil
 }
 
-func (r *Redis) LPush(key string, values []string) (int64, error) {
-	args := []interface{}{"LPUSH", key}
-	for _, value := range values {
-		args = append(args, value)
-	}
+func (r *Redis) LPush(key string, values ...string) (int64, error) {
+	args := r.packArgs("LPUSH", key, values)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -890,11 +874,8 @@ func (r *Redis) LTrim(key string, start, stop int) error {
 	return r.okStatusReturnValue(rp)
 }
 
-func (r *Redis) MGet(keys []string) ([][]byte, error) {
-	args := []interface{}{"MGET"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+func (r *Redis) MGet(keys ...string) ([][]byte, error) {
+	args := r.packArgs("MGET", keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -911,19 +892,13 @@ func (r *Redis) Move(key string, db int) (bool, error) {
 }
 
 func (r *Redis) MSet(pairs map[string]string) error {
-	args := []interface{}{"MSET"}
-	for key, value := range pairs {
-		args = append(args, key, value)
-	}
+	args := r.packArgs("MSET", pairs)
 	_, err := r.sendCommand(args...)
 	return err
 }
 
 func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
-	args := []interface{}{"MSETNX"}
-	for key, value := range pairs {
-		args = append(args, key, value)
-	}
+	args := r.packArgs("MSETNX", pairs)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return false, err
@@ -1009,7 +984,7 @@ func (r *Redis) Renamenx(key, newkey string) (bool, error) {
 }
 
 func (r *Redis) Restore(key string, ttl int, serialized []byte) error {
-	rp, err := r.sendCommand("RESTORE", key, ttl, serialized)
+	rp, err := r.sendCommand("RESTORE", key, ttl, string(serialized))
 	if err != nil {
 		return err
 	}
@@ -1032,11 +1007,8 @@ func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
 	return rp.Bulk, nil
 }
 
-func (r *Redis) RPush(key string, values []string) (int64, error) {
-	args := []interface{}{"RPUSH", key}
-	for _, value := range values {
-		args = append(args, value)
-	}
+func (r *Redis) RPush(key string, values ...string) (int64, error) {
+	args := r.packArgs("RPUSH", key, values)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -1052,11 +1024,8 @@ func (r *Redis) RPushx(key, value string) (int64, error) {
 	return r.integerReturnValue(rp), nil
 }
 
-func (r *Redis) SAdd(key string, members []string) (int64, error) {
-	args := []interface{}{"SADD", key}
-	for _, member := range members {
-		args = append(args, member)
-	}
+func (r *Redis) SAdd(key string, members ...string) (int64, error) {
+	args := r.packArgs("SADD", key, members)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -1081,10 +1050,7 @@ func (r *Redis) SCard(key string) (int64, error) {
 }
 
 func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
-	args := []interface{}{"SCRIPT", "EXISTS"}
-	for _, script := range scripts {
-		args = append(args, script)
-	}
+	args := r.packArgs("SCRIPT", "EXISTS", scripts)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -1121,14 +1087,11 @@ func (r *Redis) ScriptLoad(script string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.bulkReturnValue(rp), nil
+	return r.stringBulkReturnValue(rp), nil
 }
 
 func (r *Redis) SDiff(keys ...string) ([]string, error) {
-	args := []interface{}{"SDIFF"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("SDIFF", keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -1137,7 +1100,7 @@ func (r *Redis) SDiff(keys ...string) ([]string, error) {
 }
 
 func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, must_not_exists bool) error {
-	args := []interface{}{"SET", key, value}
+	args := r.packArgs("SET", key, value)
 	if seconds > 0 {
 		args = append(args, "EX", seconds)
 	}
@@ -1198,10 +1161,7 @@ func (r *Redis) Shutdown(save, no_save bool) error {
 }
 
 func (r *Redis) SInter(keys ...string) ([]string, error) {
-	args := []interface{}{"SINTER"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("SINTER", keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -1210,10 +1170,7 @@ func (r *Redis) SInter(keys ...string) ([]string, error) {
 }
 
 func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
-	args := []interface{}{"SINTERSTORE", destination}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("SINTERSTORE", destination, keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -1277,11 +1234,8 @@ func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
 	return rp.Multi, nil
 }
 
-func (r *Redis) SRem(key string, members []string) (int64, error) {
-	args := []interface{}{"SREM", key}
-	for _, member := range members {
-		args = append(args, member)
-	}
+func (r *Redis) SRem(key string, members ...string) (int64, error) {
+	args := r.packArgs("SREM", key, members)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -1298,10 +1252,7 @@ func (r *Redis) StrLen(key string) (int64, error) {
 }
 
 func (r *Redis) SUnion(keys ...string) ([]string, error) {
-	args := []interface{}{"SUNION"}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("SUNION", keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return nil, err
@@ -1310,10 +1261,7 @@ func (r *Redis) SUnion(keys ...string) ([]string, error) {
 }
 
 func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
-	args := []interface{}{"SUNIONSTORE", destination}
-	for _, key := range keys {
-		args = append(args, key)
-	}
+	args := r.packArgs("SUNIONSTORE", destination, keys)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
@@ -1350,14 +1298,11 @@ func (r *Redis) Type(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.statusReturnValue(rp), nil
+	return rp.Status, nil
 }
 
 func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
-	args := []interface{}{"ZADD", key}
-	for score, member := range pairs {
-		args = append(args, score, member)
-	}
+	args := r.packArgs("ZADD", key, pairs)
 	rp, err := r.sendCommand(args...)
 	if err != nil {
 		return 0, err
