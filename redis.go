@@ -1041,6 +1041,7 @@ func (r *Redis) LPushx(key, value string) (int64, error) {
 // with 0 being the first element of the list (the head of the list), 1 being the next element and so on.
 // These offsets can also be negative numbers indicating offsets starting at the end of the list.
 // For example, -1 is the last element of the list, -2 the penultimate, and so on.
+//
 // Note that if you have a list of numbers from 0 to 100, LRANGE list 0 10 will return 11 elements,
 // that is, the rightmost item is included.
 // Out of range indexes will not produce an error.
@@ -1155,6 +1156,7 @@ func (r *Redis) Persist(key string) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
+// This command works exactly like EXPIRE but the time to live of the key is specified in milliseconds instead of seconds.
 func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
 	rp, err := r.sendCommand("PEXPIRE", key, milliseconds)
 	if err != nil {
@@ -1163,6 +1165,8 @@ func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
+// PEXPIREAT has the same effect and semantic as EXPIREAT,
+// but the Unix time at which the key will expire is specified in milliseconds instead of seconds.
 func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
 	rp, err := r.sendCommand("PEXPIREAT", key, timestamp)
 	if err != nil {
@@ -1171,22 +1175,20 @@ func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
+// Returns PONG. This command is often used to test if a connection is still alive, or to measure latency.
 func (r *Redis) Ping() error {
-	rp, err := r.sendCommand("PING")
-	if err != nil {
-		return err
-	}
-	if rp.Status != "PONG" {
-		return errors.New(rp.Status)
-	}
-	return nil
+	_, err := r.sendCommand("PING")
+	return err
 }
 
+// PSETEX works exactly like SETEX with the sole difference that the expire time is specified in milliseconds instead of seconds.
 func (r *Redis) PSetex(key string, milliseconds int, value string) error {
 	_, err := r.sendCommand("PSETEX", key, milliseconds, value)
 	return err
 }
 
+// Like TTL this command returns the remaining time to live of a key that has an expire set,
+// with the sole difference that TTL returns the amount of remaining time in seconds while PTTL returns it in milliseconds.
 func (r *Redis) PTTL(key string) (int64, error) {
 	rp, err := r.sendCommand("PTTL", key)
 	if err != nil {
@@ -1195,11 +1197,15 @@ func (r *Redis) PTTL(key string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Ask the server to close the connection.
+// The connection is closed as soon as all pending replies have been written to the client.
 func (r *Redis) Quit() error {
 	_, err := r.sendCommand("QUIT")
 	return err
 }
 
+// Return a random key from the currently selected database.
+// Bulk reply: the random key, or nil when the database is empty.
 func (r *Redis) RandomKey() ([]byte, error) {
 	rp, err := r.sendCommand("RANDOMKEY")
 	if err != nil {
@@ -1208,6 +1214,10 @@ func (r *Redis) RandomKey() ([]byte, error) {
 	return rp.Bulk, nil
 }
 
+// Renames key to newkey.
+// It returns an error when the source and destination names are the same, or when key does not exist.
+// If newkey already exists it is overwritten, when this happens RENAME executes an implicit DEL operation,
+// so if the deleted key contains a very big value it may cause high latency even if RENAME itself is usually a constant-time operation.
 func (r *Redis) Rename(key, newkey string) error {
 	rp, err := r.sendCommand("RENAME", key, newkey)
 	if err != nil {
@@ -1216,6 +1226,8 @@ func (r *Redis) Rename(key, newkey string) error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Renames key to newkey if newkey does not yet exist.
+// It returns an error under the same conditions as RENAME.
 func (r *Redis) Renamenx(key, newkey string) (bool, error) {
 	rp, err := r.sendCommand("RENAMENX", key, newkey)
 	if err != nil {
@@ -1224,14 +1236,19 @@ func (r *Redis) Renamenx(key, newkey string) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
-func (r *Redis) Restore(key string, ttl int, serialized []byte) error {
-	rp, err := r.sendCommand("RESTORE", key, ttl, string(serialized))
+// Create a key associated with a value that is obtained by deserializing the provided serialized value (obtained via DUMP).
+// If ttl is 0 the key is created without any expire, otherwise the specified expire time (in milliseconds) is set.
+// RESTORE checks the RDB version and data checksum. If they don't match an error is returned.
+func (r *Redis) Restore(key string, ttl int, serialized string) error {
+	rp, err := r.sendCommand("RESTORE", key, ttl, serialized)
 	if err != nil {
 		return err
 	}
 	return r.okStatusReturnValue(rp)
 }
 
+// Removes and returns the last element of the list stored at key.
+// Bulk reply: the value of the last element, or nil when key does not exist.
 func (r *Redis) RPop(key string) ([]byte, error) {
 	rp, err := r.sendCommand("RPOP", key)
 	if err != nil {
@@ -1240,6 +1257,13 @@ func (r *Redis) RPop(key string) ([]byte, error) {
 	return rp.Bulk, nil
 }
 
+// Atomically returns and removes the last element (tail) of the list stored at source,
+// and pushes the element at the first element (head) of the list stored at destination.
+//
+// If source does not exist, the value nil is returned and no operation is performed.
+// If source and destination are the same,
+// the operation is equivalent to removing the last element from the list and pushing it as first element of the list,
+// so it can be considered as a list rotation command.
 func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
 	rp, err := r.sendCommand("RPOPLPUSH", source, destination)
 	if err != nil {
@@ -1248,6 +1272,9 @@ func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
 	return rp.Bulk, nil
 }
 
+// Insert all the specified values at the tail of the list stored at key.
+// If key does not exist, it is created as empty list before performing the push operation.
+// When key holds a value that is not a list, an error is returned.
 func (r *Redis) RPush(key string, values ...string) (int64, error) {
 	args := r.packArgs("RPUSH", key, values)
 	rp, err := r.sendCommand(args...)
@@ -1257,6 +1284,9 @@ func (r *Redis) RPush(key string, values ...string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Inserts value at the tail of the list stored at key,
+// only if key already exists and holds a list.
+// In contrary to RPUSH, no operation will be performed when key does not yet exist.
 func (r *Redis) RPushx(key, value string) (int64, error) {
 	rp, err := r.sendCommand("RPUSHX", key, value)
 	if err != nil {
@@ -1265,6 +1295,13 @@ func (r *Redis) RPushx(key, value string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Add the specified members to the set stored at key.
+// Specified members that are already a member of this set are ignored.
+// If key does not exist, a new set is created before adding the specified members.
+// An error is returned when the value stored at key is not a set.
+//
+// Integer reply: the number of elements that were added to the set,
+// not including all the elements already present into the set.
 func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 	args := r.packArgs("SADD", key, members)
 	rp, err := r.sendCommand(args...)
@@ -1274,6 +1311,10 @@ func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// The SAVE commands performs a synchronous save of the dataset producing a point in time snapshot of all the data inside the Redis instance,
+// in the form of an RDB file.
+//
+// You almost never want to call SAVE in production environments where it will block all the other clients. Instead usually BGSAVE is used.
 func (r *Redis) Save() error {
 	rp, err := r.sendCommand("SAVE")
 	if err != nil {
@@ -1282,6 +1323,7 @@ func (r *Redis) Save() error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Returns the set cardinality (number of elements) of the set stored at key.
 func (r *Redis) SCard(key string) (int64, error) {
 	rp, err := r.sendCommand("SCARD", key)
 	if err != nil {
@@ -1290,6 +1332,9 @@ func (r *Redis) SCard(key string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Returns information about the existence of the scripts in the script cache.
+// Multi-bulk reply The command returns an array of integers that correspond to the specified SHA1 digest arguments.
+// For every corresponding SHA1 digest of a script that actually exists in the script cache.
 func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
 	args := r.packArgs("SCRIPT", "EXISTS", scripts)
 	rp, err := r.sendCommand(args...)
@@ -1307,6 +1352,8 @@ func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
 	return result, nil
 }
 
+// Flush the Lua scripts cache.
+// Please refer to the EVAL documentation for detailed information about Redis Lua scripting.
 func (r *Redis) ScriptFlush() error {
 	rp, err := r.sendCommand("SCRIPT", "FLUSH")
 	if err != nil {
@@ -1315,6 +1362,7 @@ func (r *Redis) ScriptFlush() error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Kills the currently executing Lua script, assuming no write operation was yet performed by the script.
 func (r *Redis) ScriptKill() error {
 	rp, err := r.sendCommand("SCRIPT", "KILL")
 	if err != nil {
@@ -1323,6 +1371,10 @@ func (r *Redis) ScriptKill() error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Load a script into the scripts cache, without executing it.
+// After the specified command is loaded into the script cache it will be callable using EVALSHA with the correct SHA1 digest of the script,
+// exactly like after the first successful invocation of EVAL.
+// Bulk reply This command returns the SHA1 digest of the script added into the script cache.
 func (r *Redis) ScriptLoad(script string) (string, error) {
 	rp, err := r.sendCommand("SCRIPT", "LOAD", script)
 	if err != nil {
@@ -1331,6 +1383,9 @@ func (r *Redis) ScriptLoad(script string) (string, error) {
 	return r.stringBulkReturnValue(rp), nil
 }
 
+// Returns the members of the set resulting from the difference between the first set and all the successive sets.
+// Keys that do not exist are considered to be empty sets.
+// Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	args := r.packArgs("SDIFF", keys)
 	rp, err := r.sendCommand(args...)
@@ -1340,6 +1395,9 @@ func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	return r.listReturnValue(rp), nil
 }
 
+// Set key to hold the string value.
+// If key already holds a value, it is overwritten, regardless of its type.
+// Any previous time to live associated with the key is discarded on successful SET operation.
 func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, must_not_exists bool) error {
 	args := r.packArgs("SET", key, value)
 	if seconds > 0 {
@@ -1360,6 +1418,8 @@ func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, m
 	return r.okStatusReturnValue(rp)
 }
 
+// Sets or clears the bit at offset in the string value stored at key.
+// Integer reply: the original bit value stored at offset.
 func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
 	rp, err := r.sendCommand("SETBIT", key, offset, value)
 	if err != nil {
@@ -1368,6 +1428,7 @@ func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Set key to hold the string value and set key to timeout after a given number of seconds.
 func (r *Redis) Setex(key string, seconds int, value string) error {
 	rp, err := r.sendCommand("SETEX", key, seconds, value)
 	if err != nil {
@@ -1376,6 +1437,17 @@ func (r *Redis) Setex(key string, seconds int, value string) error {
 	return r.okStatusReturnValue(rp)
 }
 
+// Set key to hold string value if key does not exist.
+func (r *Redis) Setnx(key, value string) (bool, error) {
+	rp, err := r.sendCommand("SETNX", key, value)
+	if err != nil {
+		return false, err
+	}
+	return r.booleanReturnValue(rp), nil
+}
+
+// Overwrites part of the string stored at key, starting at the specified offset, for the entire length of value.
+// Integer reply: the length of the string after it was modified by the command.
 func (r *Redis) SetRange(key string, offset int, value string) (int64, error) {
 	rp, err := r.sendCommand("SETRANGE", key, offset, value)
 	if err != nil {
@@ -1384,8 +1456,13 @@ func (r *Redis) SetRange(key string, offset int, value string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// The command behavior is the following:
+// Stop all the clients.
+// Perform a blocking SAVE if at least one save point is configured.
+// Flush the Append Only File if AOF is enabled.
+// Quit the server.
 func (r *Redis) Shutdown(save, no_save bool) error {
-	args := []interface{}{"SHUTDOWN"}
+	args := r.packArgs("SHUTDOWN")
 	if save {
 		args = append(args, "SAVE")
 	} else if no_save {
@@ -1401,6 +1478,8 @@ func (r *Redis) Shutdown(save, no_save bool) error {
 	return errors.New(rp.Status)
 }
 
+// Returns the members of the set resulting from the intersection of all the given sets.
+// Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SInter(keys ...string) ([]string, error) {
 	args := r.packArgs("SINTER", keys)
 	rp, err := r.sendCommand(args...)
@@ -1410,6 +1489,9 @@ func (r *Redis) SInter(keys ...string) ([]string, error) {
 	return r.listReturnValue(rp), nil
 }
 
+// This command is equal to SINTER, but instead of returning the resulting set, it is stored in destination.
+// If destination already exists, it is overwritten.
+// Integer reply: the number of elements in the resulting set.
 func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
 	args := r.packArgs("SINTERSTORE", destination, keys)
 	rp, err := r.sendCommand(args...)
@@ -1419,6 +1501,7 @@ func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
 	return rp.Integer, nil
 }
 
+// Returns if member is a member of the set stored at key.
 func (r *Redis) SIsMember(key, member string) (bool, error) {
 	rp, err := r.sendCommand("SISMEMBER", key, member)
 	if err != nil {
@@ -1427,6 +1510,16 @@ func (r *Redis) SIsMember(key, member string) (bool, error) {
 	return r.booleanReturnValue(rp), nil
 }
 
+// The SLAVEOF command can change the replication settings of a slave on the fly.
+// If a Redis server is already acting as slave, the command SLAVEOF NO ONE will turn off the replication,
+// turning the Redis server into a MASTER.
+// In the proper form SLAVEOF hostname port will make the server a slave of another server listening at the specified hostname and port.
+//
+// If a server is already a slave of some master,
+// SLAVEOF hostname port will stop the replication against the old server and start the synchronization against the new one, discarding the old dataset.
+// The form SLAVEOF NO ONE will stop replication, turning the server into a MASTER, but will not discard the replication.
+// So, if the old master stops working, it is possible to turn the slave into a master and set the application to use this new master in read/write.
+// Later when the other Redis server is fixed, it can be reconfigured to work as a slave.
 func (r *Redis) SlaveOf(host, port string) error {
 	rp, err := r.sendCommand("SLAVEOF", host, port)
 	if err != nil {
