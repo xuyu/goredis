@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -22,14 +23,14 @@ func TestDial(t *testing.T) {
 }
 
 func TestDialFail(t *testing.T) {
-	_, err := DialTimeout(network, "127.0.0.1:63790", 0, "", 5*time.Second, 5)
+	_, err := DialTimeout(network, address+"0", 0, "", 5*time.Second, 5)
 	if err == nil {
 		t.Error(err)
 	}
 }
 
 func TestDiaURL(t *testing.T) {
-	rawurl := "redis://127.0.0.1:6379/1?size=5&timeout=10s"
+	rawurl := fmt.Sprintf("redis://%s/1?size=5&timeout=10s", address)
 	r, err := DialURL(rawurl)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +41,7 @@ func TestDiaURL(t *testing.T) {
 }
 
 func TestDialURLFail(t *testing.T) {
-	rawurl := "redis://tester:password@127.0.0.1:6379/1"
+	rawurl := fmt.Sprintf("redis://tester:password@%s/1", address)
 	_, err := DialURL(rawurl)
 	if err == nil {
 		t.Fail()
