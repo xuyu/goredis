@@ -1324,6 +1324,20 @@ func (r *Redis) PTTL(key string) (int64, error) {
 	return r.integerReturnValue(rp)
 }
 
+// Posts a message to the given channel.
+// Integer reply: the number of clients that received the message.
+func (r *Redis) Publish(channel, message string) (int64, error) {
+	rp, err := r.sendCommand("PUBLISH", channel, message)
+	if err != nil {
+		return 0, err
+	}
+	return r.integerReturnValue(rp)
+}
+
+func (r *Redis) PubSub() (*PubSub, error) {
+	return newPubSub(r)
+}
+
 // Ask the server to close the connection.
 // The connection is closed as soon as all pending replies have been written to the client.
 func (r *Redis) Quit() error {
@@ -2019,4 +2033,64 @@ func (t *Transaction) Command(args ...interface{}) error {
 		return errors.New(s)
 	}
 	return nil
+}
+
+type PubSub struct {
+	redis *Redis
+	c     *connection
+	msg   chan interface{}
+}
+
+func newPubSub(r *Redis) (*PubSub, error) {
+	c, err := r.openConnection()
+	if err != nil {
+		return nil, err
+	}
+	p := &PubSub{
+		redis: r,
+		c:     c,
+		msg:   make(chan interface{}),
+	}
+	go p.waitMsg()
+	return p, nil
+}
+
+func (p *PubSub) waitMsg() {
+	for {
+		rp, err := p.c.recvReply()
+		if err != nil {
+			p.msg <- err
+			break
+		}
+		p.msg <- rp
+	}
+}
+
+func (p *PubSub) Close() error {
+	close(p.msg)
+	return p.c.conn.Close()
+}
+
+func (p *PubSub) Message() <-chan interface{} {
+	return p.msg
+}
+
+func (p *PubSub) Subscribe(channels ...string) error {
+	args := packArgs("SUBSCRIBE", channels)
+	return p.c.sendCommand(args...)
+}
+
+func (p *PubSub) PSubscribe(patterns ...string) error {
+	args := packArgs("PSUBSCRIBE", patterns)
+	return p.c.sendCommand(args...)
+}
+
+func (p *PubSub) UnSubscribe(channels ...string) error {
+	args := packArgs("UNSUBSCRIBE", channels)
+	return p.c.sendCommand(args...)
+}
+
+func (p *PubSub) PUnSubscribe(patterns ...string) error {
+	args := packArgs("PUNSUBSCRIBE", patterns)
+	return p.c.sendCommand(args...)
 }
