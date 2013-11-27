@@ -56,6 +56,169 @@ type Reply struct {
 	Multi   []*Reply
 }
 
+func (rp *Reply) IntegerValue() (int64, error) {
+	if rp.Type == ErrorReply {
+		return 0, errors.New(rp.Error)
+	}
+	if rp.Type != IntegerReply {
+		return 0, errors.New("invalid reply type, not integer")
+	}
+	return rp.Integer, nil
+}
+
+// Integer replies are also extensively used in order to return true or false.
+// For instance commands like EXISTS or SISMEMBER will return 1 for true and 0 for false.
+func (rp *Reply) BooleanValue() (bool, error) {
+	if rp.Type == ErrorReply {
+		return false, errors.New(rp.Error)
+	}
+	if rp.Type != IntegerReply {
+		return false, errors.New("invalid reply type, not integer")
+	}
+	return rp.Integer != 0, nil
+}
+
+func (rp *Reply) StatusValue() (string, error) {
+	if rp.Type == ErrorReply {
+		return "", errors.New(rp.Error)
+	}
+	if rp.Type != StatusReply {
+		return "", errors.New("invalid reply type, not status")
+	}
+	return rp.Status, nil
+}
+
+func (rp *Reply) OKStatusValue() error {
+	if rp.Type == ErrorReply {
+		return errors.New(rp.Error)
+	}
+	if rp.Type != StatusReply {
+		return errors.New("invalid reply type, not status")
+	}
+	if rp.Status == "OK" {
+		return nil
+	}
+	return errors.New(rp.Status)
+}
+
+func (rp *Reply) BytesBulkValue() ([]byte, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != BulkReply {
+		return nil, errors.New("invalid reply type, not bulk")
+	}
+	return rp.Bulk, nil
+}
+
+func (rp *Reply) StringBulkValue() (string, error) {
+	if rp.Type == ErrorReply {
+		return "", errors.New(rp.Error)
+	}
+	if rp.Type != BulkReply {
+		return "", errors.New("invalid reply type, not bulk")
+	}
+	if rp.Bulk == nil {
+		return "", nil
+	}
+	return string(rp.Bulk), nil
+}
+
+func (rp *Reply) MultiValue() ([]*Reply, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("invalid reply type, not multi bulk")
+	}
+	return rp.Multi, nil
+}
+
+func (rp *Reply) HashValue() (map[string]string, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("invalid reply type, not multi bulk")
+	}
+	result := make(map[string]string)
+	if rp.Multi != nil {
+		length := len(rp.Multi)
+		for i := 0; i < length/2; i++ {
+			key, err := rp.Multi[i*2].StringBulkValue()
+			if err != nil {
+				return nil, err
+			}
+			value, err := rp.Multi[i*2+1].StringBulkValue()
+			if err != nil {
+				return nil, err
+			}
+			result[key] = value
+		}
+	}
+	return result, nil
+}
+
+func (rp *Reply) ListValue() ([]string, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("invalid reply type, not multi bulk")
+	}
+	var result []string
+	if rp.Multi != nil {
+		for _, subrp := range rp.Multi {
+			item, err := subrp.StringBulkValue()
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (rp *Reply) BytesArrayValue() ([][]byte, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("invalid reply type, not multi bulk")
+	}
+	var result [][]byte
+	if rp.Multi != nil {
+		for _, subrp := range rp.Multi {
+			b, err := subrp.BytesBulkValue()
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, b)
+		}
+	}
+	return result, nil
+}
+
+func (rp *Reply) BoolArrayValue() ([]bool, error) {
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("invalid reply type, not multi bulk")
+	}
+	var result []bool
+	if rp.Multi != nil {
+		for _, subrp := range rp.Multi {
+			b, err := subrp.BooleanValue()
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, b)
+		}
+	}
+	return result, nil
+}
+
 func packArgs(items ...interface{}) (args []interface{}) {
 	for _, item := range items {
 		v := reflect.ValueOf(item)
@@ -322,176 +485,13 @@ func (r *Redis) SendCommand(args ...interface{}) (*Reply, error) {
 	return c.RecvReply()
 }
 
-func (r *Redis) IntegerReturnValue(rp *Reply) (int64, error) {
-	if rp.Type == ErrorReply {
-		return 0, errors.New(rp.Error)
-	}
-	if rp.Type != IntegerReply {
-		return 0, errors.New("invalid reply type, not integer")
-	}
-	return rp.Integer, nil
-}
-
-// Integer replies are also extensively used in order to return true or false.
-// For instance commands like EXISTS or SISMEMBER will return 1 for true and 0 for false.
-func (r *Redis) BooleanReturnValue(rp *Reply) (bool, error) {
-	if rp.Type == ErrorReply {
-		return false, errors.New(rp.Error)
-	}
-	if rp.Type != IntegerReply {
-		return false, errors.New("invalid reply type, not integer")
-	}
-	return rp.Integer != 0, nil
-}
-
-func (r *Redis) StatusReturnValue(rp *Reply) (string, error) {
-	if rp.Type == ErrorReply {
-		return "", errors.New(rp.Error)
-	}
-	if rp.Type != StatusReply {
-		return "", errors.New("invalid reply type, not status")
-	}
-	return rp.Status, nil
-}
-
-func (r *Redis) OKStatusReturnValue(rp *Reply) error {
-	if rp.Type == ErrorReply {
-		return errors.New(rp.Error)
-	}
-	if rp.Type != StatusReply {
-		return errors.New("invalid reply type, not status")
-	}
-	if rp.Status == "OK" {
-		return nil
-	}
-	return errors.New(rp.Status)
-}
-
-func (r *Redis) BytesBulkReturnValue(rp *Reply) ([]byte, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != BulkReply {
-		return nil, errors.New("invalid reply type, not bulk")
-	}
-	return rp.Bulk, nil
-}
-
-func (r *Redis) StringBulkReturnValue(rp *Reply) (string, error) {
-	if rp.Type == ErrorReply {
-		return "", errors.New(rp.Error)
-	}
-	if rp.Type != BulkReply {
-		return "", errors.New("invalid reply type, not bulk")
-	}
-	if rp.Bulk == nil {
-		return "", nil
-	}
-	return string(rp.Bulk), nil
-}
-
-func (r *Redis) MultiReplyReturnValue(rp *Reply) ([]*Reply, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != MultiReply {
-		return nil, errors.New("invalid reply type, not multi bulk")
-	}
-	return rp.Multi, nil
-}
-
-func (r *Redis) HashReturnValue(rp *Reply) (map[string]string, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != MultiReply {
-		return nil, errors.New("invalid reply type, not multi bulk")
-	}
-	result := make(map[string]string)
-	if rp.Multi != nil {
-		length := len(rp.Multi)
-		for i := 0; i < length/2; i++ {
-			key, err := r.StringBulkReturnValue(rp.Multi[i*2])
-			if err != nil {
-				return nil, err
-			}
-			value, err := r.StringBulkReturnValue(rp.Multi[i*2+1])
-			if err != nil {
-				return nil, err
-			}
-			result[key] = value
-		}
-	}
-	return result, nil
-}
-
-func (r *Redis) ListReturnValue(rp *Reply) ([]string, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != MultiReply {
-		return nil, errors.New("invalid reply type, not multi bulk")
-	}
-	var result []string
-	if rp.Multi != nil {
-		for _, subrp := range rp.Multi {
-			item, err := r.StringBulkReturnValue(subrp)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, item)
-		}
-	}
-	return result, nil
-}
-
-func (r *Redis) BytesArrayReturnValue(rp *Reply) ([][]byte, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != MultiReply {
-		return nil, errors.New("invalid reply type, not multi bulk")
-	}
-	var result [][]byte
-	if rp.Multi != nil {
-		for _, subrp := range rp.Multi {
-			b, err := r.BytesBulkReturnValue(subrp)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, b)
-		}
-	}
-	return result, nil
-}
-
-func (r *Redis) BoolArrayReturnValue(rp *Reply) ([]bool, error) {
-	if rp.Type == ErrorReply {
-		return nil, errors.New(rp.Error)
-	}
-	if rp.Type != MultiReply {
-		return nil, errors.New("invalid reply type, not multi bulk")
-	}
-	var result []bool
-	if rp.Multi != nil {
-		for _, subrp := range rp.Multi {
-			b, err := r.BooleanReturnValue(subrp)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, b)
-		}
-	}
-	return result, nil
-}
-
 // Integer reply: the length of the string after the append operation.
 func (r *Redis) Append(key, value string) (int64, error) {
 	rp, err := r.SendCommand("APPEND", key, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // If password matches the password in the configuration file,
@@ -502,7 +502,7 @@ func (r *Redis) Auth(password string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Instruct Redis to start an Append Only File rewrite process.
@@ -527,7 +527,7 @@ func (r *Redis) BitCount(key, start, end string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Perform a bitwise operation between multiple keys (containing string values) and store the result in the destination key.
@@ -544,7 +544,7 @@ func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) 
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // BLPOP is a blocking list pop primitive.
@@ -564,7 +564,7 @@ func (r *Redis) BLPop(keys []string, timeout int) ([]string, error) {
 	if rp.Multi == nil {
 		return nil, nil
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // See the BLPOP documentation for the exact semantics,
@@ -579,7 +579,7 @@ func (r *Redis) BRPop(keys []string, timeout int) ([]string, error) {
 	if rp.Multi == nil {
 		return nil, nil
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // BRPOPLPUSH is the blocking variant of RPOPLPUSH.
@@ -597,7 +597,7 @@ func (r *Redis) BRPopLPush(source, destination string, timeout int) ([]byte, err
 	if rp.Type == MultiReply {
 		return nil, nil
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // The CLIENT KILL command closes a given client connection identified by ip:port.
@@ -609,7 +609,7 @@ func (r *Redis) ClientKill(ip string, port int) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // The CLIENT LIST command returns information and statistics about the client connections server in a mostly human readable format.
@@ -621,7 +621,7 @@ func (r *Redis) ClientList() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 // The CLIENT GETNAME returns the name of the current connection as set by CLIENT SETNAME.
@@ -632,7 +632,7 @@ func (r *Redis) ClientGetName() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // The CLIENT SETNAME command assigns a name to the current connection.
@@ -641,7 +641,7 @@ func (r *Redis) ClientSetName(name string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // The CONFIG GET command is used to read the configuration parameters of a running Redis server.
@@ -653,7 +653,7 @@ func (r *Redis) ConfigGet(parameter string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.HashReturnValue(rp)
+	return rp.HashValue()
 }
 
 // The CONFIG REWRITE command rewrites the redis.conf file the server was started with,
@@ -665,7 +665,7 @@ func (r *Redis) ConfigRewrite() error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // The CONFIG SET command is used in order to reconfigure the server at run time without the need to restart Redis.
@@ -675,7 +675,7 @@ func (r *Redis) ConfigSet(parameter, value string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Resets the statistics reported by Redis using the INFO command.
@@ -699,7 +699,7 @@ func (r *Redis) DBSize() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 /*
@@ -724,7 +724,7 @@ func (r *Redis) Decr(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Decrements the number stored at key by decrement.
@@ -733,7 +733,7 @@ func (r *Redis) DecrBy(key string, decrement int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Removes the specified keys.
@@ -745,7 +745,7 @@ func (r *Redis) Del(keys ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Serialize the value stored at key in a Redis-specific format and return it to the user.
@@ -756,7 +756,7 @@ func (r *Redis) Dump(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 func (r *Redis) Echo(message string) (string, error) {
@@ -764,7 +764,7 @@ func (r *Redis) Echo(message string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
@@ -782,7 +782,7 @@ func (r *Redis) Exists(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Set a timeout on key.
@@ -793,7 +793,7 @@ func (r *Redis) Expire(key string, seconds int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // EXPIREAT has the same effect and semantic as EXPIRE,
@@ -804,7 +804,7 @@ func (r *Redis) ExpireAt(key string, timestamp int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Delete all the keys of all the existing databases,
@@ -831,7 +831,7 @@ func (r *Redis) Get(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Returns the bit value at offset in the string value stored at key.
@@ -844,7 +844,7 @@ func (r *Redis) GetBit(key string, offset int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the substring of the string value stored at key,
@@ -857,7 +857,7 @@ func (r *Redis) GetRange(key string, start, end int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 // Atomically sets key to value and returns the old value stored at key.
@@ -867,7 +867,7 @@ func (r *Redis) GetSet(key, value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 // Removes the specified fields from the hash stored at key.
@@ -879,7 +879,7 @@ func (r *Redis) HDel(key string, fields ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns if field is an existing field in the hash stored at key.
@@ -888,7 +888,7 @@ func (r *Redis) HExists(key, field string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Returns the value associated with field in the hash stored at key.
@@ -899,7 +899,7 @@ func (r *Redis) HGet(key, field string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Returns all fields and values of the hash stored at key.
@@ -910,7 +910,7 @@ func (r *Redis) HGetAll(key string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.HashReturnValue(rp)
+	return rp.HashValue()
 }
 
 // Increments the number stored at field in the hash stored at key by increment.
@@ -922,7 +922,7 @@ func (r *Redis) HIncrBy(key, field string, increment int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Increment the specified field of an hash stored at key,
@@ -937,7 +937,7 @@ func (r *Redis) HIncrByFloat(key, field string, increment float64) (float64, err
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.StringBulkReturnValue(rp)
+	s, err := rp.StringBulkValue()
 	if err != nil {
 		return 0.0, err
 	}
@@ -951,7 +951,7 @@ func (r *Redis) HKeys(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Returns the number of fields contained in the hash stored at key.
@@ -961,7 +961,7 @@ func (r *Redis) HLen(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the values associated with the specified fields in the hash stored at key.
@@ -975,7 +975,7 @@ func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesArrayReturnValue(rp)
+	return rp.BytesArrayValue()
 }
 
 // Sets the specified fields to their respective values in the hash stored at key.
@@ -987,7 +987,7 @@ func (r *Redis) HMSet(key string, pairs map[string]string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Sets field in the hash stored at key to value.
@@ -998,7 +998,7 @@ func (r *Redis) HSet(key, field, value string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Sets field in the hash stored at key to value, only if field does not yet exist.
@@ -1009,7 +1009,7 @@ func (r *Redis) HSetnx(key, field, value string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Returns all values in the hash stored at key.
@@ -1019,7 +1019,7 @@ func (r *Redis) HVals(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Increments the number stored at key by one.
@@ -1032,7 +1032,7 @@ func (r *Redis) Incr(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Increments the number stored at key by increment.
@@ -1045,7 +1045,7 @@ func (r *Redis) IncrBy(key string, increment int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Bulk reply: the value of key after the increment.
@@ -1054,7 +1054,7 @@ func (r *Redis) IncrByFloat(key string, increment float64) (float64, error) {
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.StringBulkReturnValue(rp)
+	s, err := rp.StringBulkValue()
 	if err != nil {
 		return 0.0, err
 	}
@@ -1070,7 +1070,7 @@ func (r *Redis) Info(section string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 // Returns all keys matching pattern.
@@ -1079,7 +1079,7 @@ func (r *Redis) Keys(pattern string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Return the UNIX TIME of the last DB save executed with success.
@@ -1091,7 +1091,7 @@ func (r *Redis) LastSave() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the element at index index in the list stored at key.
@@ -1106,7 +1106,7 @@ func (r *Redis) LIndex(key string, index int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Inserts value in the list stored at key either before or after the reference value pivot.
@@ -1118,7 +1118,7 @@ func (r *Redis) LInsert(key, position, pivot, value string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the length of the list stored at key.
@@ -1129,7 +1129,7 @@ func (r *Redis) LLen(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Removes and returns the first element of the list stored at key.
@@ -1139,7 +1139,7 @@ func (r *Redis) LPop(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Insert all the specified values at the head of the list stored at key.
@@ -1152,7 +1152,7 @@ func (r *Redis) LPush(key string, values ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Inserts value at the head of the list stored at key,
@@ -1164,7 +1164,7 @@ func (r *Redis) LPushx(key, value string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the specified elements of the list stored at key.
@@ -1184,7 +1184,7 @@ func (r *Redis) LRange(key string, start, end int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Removes the first count occurrences of elements equal to value from the list stored at key.
@@ -1198,7 +1198,7 @@ func (r *Redis) LRem(key string, count int, value string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Sets the list element at index to value. For more information on the index argument, see LINDEX.
@@ -1208,7 +1208,7 @@ func (r *Redis) LSet(key string, index int, value string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Trim an existing list so that it will contain only the specified range of elements specified.
@@ -1218,7 +1218,7 @@ func (r *Redis) LTrim(key string, start, stop int) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Returns the values of all specified keys.
@@ -1231,7 +1231,7 @@ func (r *Redis) MGet(keys ...string) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesArrayReturnValue(rp)
+	return rp.BytesArrayValue()
 }
 
 // Move key from the currently selected database (see SELECT) to the specified destination database.
@@ -1242,7 +1242,7 @@ func (r *Redis) Move(key string, db int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Sets the given keys to their respective values.
@@ -1264,7 +1264,7 @@ func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 /*
@@ -1284,7 +1284,7 @@ func (r *Redis) Persist(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // This command works exactly like EXPIRE but the time to live of the key is specified in milliseconds instead of seconds.
@@ -1293,7 +1293,7 @@ func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // PEXPIREAT has the same effect and semantic as EXPIREAT,
@@ -1303,7 +1303,7 @@ func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Returns PONG. This command is often used to test if a connection is still alive, or to measure latency.
@@ -1325,7 +1325,7 @@ func (r *Redis) PTTL(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Posts a message to the given channel.
@@ -1335,7 +1335,7 @@ func (r *Redis) Publish(channel, message string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 func (r *Redis) PubSub() (*PubSub, error) {
@@ -1356,7 +1356,7 @@ func (r *Redis) RandomKey() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Renames key to newkey.
@@ -1368,7 +1368,7 @@ func (r *Redis) Rename(key, newkey string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Renames key to newkey if newkey does not yet exist.
@@ -1378,7 +1378,7 @@ func (r *Redis) Renamenx(key, newkey string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Create a key associated with a value that is obtained by deserializing the provided serialized value (obtained via DUMP).
@@ -1389,7 +1389,7 @@ func (r *Redis) Restore(key string, ttl int, serialized string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Removes and returns the last element of the list stored at key.
@@ -1399,7 +1399,7 @@ func (r *Redis) RPop(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Atomically returns and removes the last element (tail) of the list stored at source,
@@ -1414,7 +1414,7 @@ func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // Insert all the specified values at the tail of the list stored at key.
@@ -1426,7 +1426,7 @@ func (r *Redis) RPush(key string, values ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Inserts value at the tail of the list stored at key,
@@ -1437,7 +1437,7 @@ func (r *Redis) RPushx(key, value string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Add the specified members to the set stored at key.
@@ -1453,7 +1453,7 @@ func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // The SAVE commands performs a synchronous save of the dataset producing a point in time snapshot of all the data inside the Redis instance,
@@ -1465,7 +1465,7 @@ func (r *Redis) Save() error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Returns the set cardinality (number of elements) of the set stored at key.
@@ -1474,7 +1474,7 @@ func (r *Redis) SCard(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns information about the existence of the scripts in the script cache.
@@ -1486,7 +1486,7 @@ func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BoolArrayReturnValue(rp)
+	return rp.BoolArrayValue()
 }
 
 // Flush the Lua scripts cache.
@@ -1496,7 +1496,7 @@ func (r *Redis) ScriptFlush() error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Kills the currently executing Lua script, assuming no write operation was yet performed by the script.
@@ -1505,7 +1505,7 @@ func (r *Redis) ScriptKill() error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Load a script into the scripts cache, without executing it.
@@ -1517,7 +1517,7 @@ func (r *Redis) ScriptLoad(script string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StringBulkReturnValue(rp)
+	return rp.StringBulkValue()
 }
 
 // Returns the members of the set resulting from the difference between the first set and all the successive sets.
@@ -1529,7 +1529,7 @@ func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Set key to hold the string value.
@@ -1552,7 +1552,7 @@ func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, m
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Sets or clears the bit at offset in the string value stored at key.
@@ -1562,7 +1562,7 @@ func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Set key to hold the string value and set key to timeout after a given number of seconds.
@@ -1571,7 +1571,7 @@ func (r *Redis) Setex(key string, seconds int, value string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Set key to hold string value if key does not exist.
@@ -1580,7 +1580,7 @@ func (r *Redis) Setnx(key, value string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // Overwrites part of the string stored at key, starting at the specified offset, for the entire length of value.
@@ -1590,7 +1590,7 @@ func (r *Redis) SetRange(key string, offset int, value string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // The command behavior is the following:
@@ -1623,7 +1623,7 @@ func (r *Redis) SInter(keys ...string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // This command is equal to SINTER, but instead of returning the resulting set, it is stored in destination.
@@ -1635,7 +1635,7 @@ func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns if member is a member of the set stored at key.
@@ -1644,7 +1644,7 @@ func (r *Redis) SIsMember(key, member string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 // The SLAVEOF command can change the replication settings of a slave on the fly.
@@ -1662,7 +1662,7 @@ func (r *Redis) SlaveOf(host, port string) error {
 	if err != nil {
 		return err
 	}
-	return r.OKStatusReturnValue(rp)
+	return rp.OKStatusValue()
 }
 
 // Returns all the members of the set value stored at key.
@@ -1671,7 +1671,7 @@ func (r *Redis) SMembers(key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Move member from the set at source to the set at destination. This operation is atomic.
@@ -1681,7 +1681,7 @@ func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return r.BooleanReturnValue(rp)
+	return rp.BooleanValue()
 }
 
 /*
@@ -1695,7 +1695,7 @@ func (r *Redis) SPop(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // When called with just the key argument, return a random element from the set value stored at key.
@@ -1705,7 +1705,7 @@ func (r *Redis) SRandMember(key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 // return an array of count distinct elements if count is positive.
@@ -1717,7 +1717,7 @@ func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesArrayReturnValue(rp)
+	return rp.BytesArrayValue()
 }
 
 // Remove the specified members from the set stored at key.
@@ -1731,7 +1731,7 @@ func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the length of the string value stored at key.
@@ -1742,7 +1742,7 @@ func (r *Redis) StrLen(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the members of the set resulting from the union of all the given sets.
@@ -1753,7 +1753,7 @@ func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // If destination already exists, it is overwritten.
@@ -1764,7 +1764,7 @@ func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 /*
@@ -1779,7 +1779,7 @@ func (r *Redis) Time() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.ListReturnValue(rp)
+	return rp.ListValue()
 }
 
 // Returns the remaining time to live of a key that has a timeout.
@@ -1789,7 +1789,7 @@ func (r *Redis) TTL(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the string representation of the type of the value stored at key.
@@ -1800,7 +1800,7 @@ func (r *Redis) Type(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return r.StatusReturnValue(rp)
+	return rp.StatusValue()
 }
 
 // Adds all the specified members with the specified scores to the sorted set stored at key.
@@ -1817,7 +1817,7 @@ func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
@@ -1827,7 +1827,7 @@ func (r *Redis) ZCard(key string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Returns the number of elements in the sorted set at key with a score between min and max.
@@ -1838,7 +1838,7 @@ func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Increments the score of member in the sorted set stored at key by increment.
@@ -1852,7 +1852,7 @@ func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, 
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.StringBulkReturnValue(rp)
+	s, err := rp.StringBulkValue()
 	if err != nil {
 		return 0.0, err
 	}
@@ -1889,7 +1889,7 @@ func (r *Redis) ZRem(key string, members ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Removes all elements in the sorted set stored at key with rank between start and stop.
@@ -1902,7 +1902,7 @@ func (r *Redis) ZRemRangeByRank(key string, start, stop int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 // Removes all elements in the sorted set stored at key with a score between min and max (inclusive).
@@ -1912,7 +1912,7 @@ func (r *Redis) ZRemRangeByScore(key string, min, max int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return r.IntegerReturnValue(rp)
+	return rp.IntegerValue()
 }
 
 /*
@@ -1927,7 +1927,7 @@ func (r *Redis) ZScore(key, member string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.BytesBulkReturnValue(rp)
+	return rp.BytesBulkValue()
 }
 
 /*
@@ -2013,7 +2013,7 @@ func (t *Transaction) Exec() ([]*Reply, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.redis.MultiReplyReturnValue(rp)
+	return rp.MultiValue()
 }
 
 func (t *Transaction) Close() {
@@ -2029,7 +2029,7 @@ func (t *Transaction) Command(args ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	s, err := t.redis.StatusReturnValue(rp)
+	s, err := rp.StatusValue()
 	if err != nil {
 		return err
 	}
