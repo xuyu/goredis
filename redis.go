@@ -164,18 +164,19 @@ func (c *connection) recvReply() (*Reply, error) {
 		if err != nil {
 			return nil, err
 		}
-		multi := make([]*Reply, i)
-		for j := 0; j < i; j++ {
-			rp, err := c.recvReply()
-			if err != nil {
-				return nil, err
+		rp := &Reply{Type: MultiReply}
+		if i >= 0 {
+			multi := make([]*Reply, i)
+			for j := 0; j < i; j++ {
+				rp, err := c.recvReply()
+				if err != nil {
+					return nil, err
+				}
+				multi[j] = rp
 			}
-			multi[j] = rp
+			rp.Multi = multi
 		}
-		return &Reply{
-			Type:  MultiReply,
-			Multi: multi,
-		}, nil
+		return rp, nil
 	}
 	return nil, errors.New("redis protocol error")
 }
@@ -307,13 +308,16 @@ func (r *Redis) sendCommand(args ...interface{}) (*Reply, error) {
 		return nil, err
 	}
 	if err := c.sendCommand(args...); err != nil {
-		if err == io.EOF {
-			c, err = r.openConnection()
-			if err != nil {
-				return nil, err
-			}
+		if err != io.EOF {
+			return nil, err
 		}
-		return nil, err
+		c, err = r.openConnection()
+		if err != nil {
+			return nil, err
+		}
+		if err = c.sendCommand(args...); err != nil {
+			return nil, err
+		}
 	}
 	return c.recvReply()
 }
