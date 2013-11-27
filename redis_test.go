@@ -167,3 +167,27 @@ func TestEval(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestExists(t *testing.T) {
+	r, _ := dial()
+	r.Del("key")
+	b, err := r.Exists("key")
+	if err != nil {
+		t.Error(err)
+	}
+	if b {
+		t.Fail()
+	}
+}
+
+func TestGet(t *testing.T) {
+	r, _ := dial()
+	r.Del("key")
+	data, err := r.Get("key")
+	if err != nil {
+		t.Error(err)
+	}
+	if data != nil {
+		t.Fail()
+	}
+}
