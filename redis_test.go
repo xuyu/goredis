@@ -109,3 +109,61 @@ func TestBLPop(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestDBSize(t *testing.T) {
+	r, _ := dial()
+	r.FlushDB()
+	n, err := r.DBSize()
+	if err != nil {
+		t.Error(err)
+	}
+	if n != 0 {
+		t.Fail()
+	}
+}
+
+func TestEval(t *testing.T) {
+	r, _ := dial()
+	rp, err := r.Eval("return {KEYS[1], KEYS[2], ARGV[1], ARGV[2]}", []string{"key1", "key2"}, []string{"arg1", "arg2"})
+	if err != nil {
+		t.Error(err)
+	}
+	l, err := r.listReturnValue(rp)
+	if err != nil {
+		t.Error(err)
+	}
+	if l[0] != "key1" || l[3] != "arg2" {
+		t.Fail()
+	}
+	rp, err = r.Eval("return redis.call('set','foo','bar')", nil, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := r.okStatusReturnValue(rp); err != nil {
+		t.Error(err)
+	}
+	rp, err = r.Eval("return 10", nil, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	n, err := r.integerReturnValue(rp)
+	if err != nil {
+		t.Error(err)
+	}
+	if n != 10 {
+		t.Fail()
+	}
+	rp, err = r.Eval("return {1,2,{3,'Hello World!'}}", nil, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(rp.Multi) != 3 {
+		t.Fail()
+	}
+	if rp.Multi[2].Multi[0].Integer != 3 {
+		t.Fail()
+	}
+	if s, err := r.stringBulkReturnValue(rp.Multi[2].Multi[1]); err != nil || s != "Hello World!" {
+		t.Fail()
+	}
+}
