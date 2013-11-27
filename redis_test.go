@@ -128,7 +128,7 @@ func TestEval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	l, err := r.listReturnValue(rp)
+	l, err := r.ListReturnValue(rp)
 	if err != nil {
 		t.Error(err)
 	}
@@ -139,14 +139,14 @@ func TestEval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := r.okStatusReturnValue(rp); err != nil {
+	if err := r.OKStatusReturnValue(rp); err != nil {
 		t.Error(err)
 	}
 	rp, err = r.Eval("return 10", nil, nil)
 	if err != nil {
 		t.Error(err)
 	}
-	n, err := r.integerReturnValue(rp)
+	n, err := r.IntegerReturnValue(rp)
 	if err != nil {
 		t.Error(err)
 	}
@@ -163,7 +163,7 @@ func TestEval(t *testing.T) {
 	if rp.Multi[2].Multi[0].Integer != 3 {
 		t.Fail()
 	}
-	if s, err := r.stringBulkReturnValue(rp.Multi[2].Multi[1]); err != nil || s != "Hello World!" {
+	if s, err := r.StringBulkReturnValue(rp.Multi[2].Multi[1]); err != nil || s != "Hello World!" {
 		t.Fail()
 	}
 }

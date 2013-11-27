@@ -104,24 +104,24 @@ func packCommand(args ...interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type connection struct {
-	conn   net.Conn
-	reader *bufio.Reader
+type Connection struct {
+	Conn   net.Conn
+	Reader *bufio.Reader
 }
 
-func (c *connection) sendCommand(args ...interface{}) error {
+func (c *Connection) SendCommand(args ...interface{}) error {
 	request, err := packCommand(args...)
 	if err != nil {
 		return err
 	}
-	if _, err := c.conn.Write(request); err != nil {
+	if _, err := c.Conn.Write(request); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *connection) recvReply() (*Reply, error) {
-	line, err := c.reader.ReadBytes('\n')
+func (c *Connection) RecvReply() (*Reply, error) {
+	line, err := c.Reader.ReadBytes('\n')
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (c *connection) recvReply() (*Reply, error) {
 		if i >= 0 {
 			multi := make([]*Reply, i)
 			for j := 0; j < i; j++ {
-				rp, err := c.recvReply()
+				rp, err := c.RecvReply()
 				if err != nil {
 					return nil, err
 				}
@@ -181,13 +181,13 @@ func (c *connection) recvReply() (*Reply, error) {
 	return nil, errors.New("redis protocol error")
 }
 
-func (c *connection) readBulk(size int) ([]byte, error) {
+func (c *Connection) readBulk(size int) ([]byte, error) {
 	// If the requested value does not exist the bulk reply will use the special value -1 as data length
 	if size < 0 {
 		return nil, nil
 	}
 	buf := make([]byte, size+2)
-	if _, err := c.reader.Read(buf); err != nil {
+	if _, err := c.Reader.Read(buf); err != nil {
 		return nil, err
 	}
 	return buf[:size], nil
@@ -200,7 +200,7 @@ type Redis struct {
 	password string
 	timeout  time.Duration
 	size     int
-	pool     chan *connection
+	pool     chan *Connection
 }
 
 func DialTimeout(network, address string, db int, password string, timeout time.Duration, size int) (*Redis, error) {
@@ -219,7 +219,7 @@ func DialTimeout(network, address string, db int, password string, timeout time.
 		password: password,
 		timeout:  timeout,
 		size:     size,
-		pool:     make(chan *connection, size),
+		pool:     make(chan *Connection, size),
 	}
 	for i := 0; i < size; i++ {
 		r.pool <- nil
@@ -264,7 +264,7 @@ func DialURL(rawurl string) (*Redis, error) {
 	return DialTimeout(network, address, db, password, timeout, size)
 }
 
-func (r *Redis) getConnection() (*connection, error) {
+func (r *Redis) getConnection() (*Connection, error) {
 	c := <-r.pool
 	if c == nil {
 		return r.openConnection()
@@ -272,42 +272,42 @@ func (r *Redis) getConnection() (*connection, error) {
 	return c, nil
 }
 
-func (r *Redis) activeConnection(c *connection) {
+func (r *Redis) activeConnection(c *Connection) {
 	r.pool <- c
 }
 
-func (r *Redis) openConnection() (*connection, error) {
+func (r *Redis) openConnection() (*Connection, error) {
 	conn, err := net.DialTimeout(r.network, r.address, r.timeout)
 	if err != nil {
 		return nil, err
 	}
-	c := &connection{conn, bufio.NewReader(conn)}
+	c := &Connection{conn, bufio.NewReader(conn)}
 	if r.password != "" {
-		if err := c.sendCommand("AUTH", r.password); err != nil {
+		if err := c.SendCommand("AUTH", r.password); err != nil {
 			return nil, err
 		}
-		if _, err := c.recvReply(); err != nil {
+		if _, err := c.RecvReply(); err != nil {
 			return nil, err
 		}
 	}
 	if r.db > 0 {
-		if err := c.sendCommand("SELECT", r.db); err != nil {
+		if err := c.SendCommand("SELECT", r.db); err != nil {
 			return nil, err
 		}
-		if _, err := c.recvReply(); err != nil {
+		if _, err := c.RecvReply(); err != nil {
 			return nil, err
 		}
 	}
 	return c, nil
 }
 
-func (r *Redis) sendCommand(args ...interface{}) (*Reply, error) {
+func (r *Redis) SendCommand(args ...interface{}) (*Reply, error) {
 	c, err := r.getConnection()
 	defer r.activeConnection(c)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.sendCommand(args...); err != nil {
+	if err := c.SendCommand(args...); err != nil {
 		if err != io.EOF {
 			return nil, err
 		}
@@ -315,14 +315,14 @@ func (r *Redis) sendCommand(args ...interface{}) (*Reply, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err = c.sendCommand(args...); err != nil {
+		if err = c.SendCommand(args...); err != nil {
 			return nil, err
 		}
 	}
-	return c.recvReply()
+	return c.RecvReply()
 }
 
-func (r *Redis) integerReturnValue(rp *Reply) (int64, error) {
+func (r *Redis) IntegerReturnValue(rp *Reply) (int64, error) {
 	if rp.Type == ErrorReply {
 		return 0, errors.New(rp.Error)
 	}
@@ -334,7 +334,7 @@ func (r *Redis) integerReturnValue(rp *Reply) (int64, error) {
 
 // Integer replies are also extensively used in order to return true or false.
 // For instance commands like EXISTS or SISMEMBER will return 1 for true and 0 for false.
-func (r *Redis) booleanReturnValue(rp *Reply) (bool, error) {
+func (r *Redis) BooleanReturnValue(rp *Reply) (bool, error) {
 	if rp.Type == ErrorReply {
 		return false, errors.New(rp.Error)
 	}
@@ -344,7 +344,7 @@ func (r *Redis) booleanReturnValue(rp *Reply) (bool, error) {
 	return rp.Integer != 0, nil
 }
 
-func (r *Redis) statusReturnValue(rp *Reply) (string, error) {
+func (r *Redis) StatusReturnValue(rp *Reply) (string, error) {
 	if rp.Type == ErrorReply {
 		return "", errors.New(rp.Error)
 	}
@@ -354,7 +354,7 @@ func (r *Redis) statusReturnValue(rp *Reply) (string, error) {
 	return rp.Status, nil
 }
 
-func (r *Redis) okStatusReturnValue(rp *Reply) error {
+func (r *Redis) OKStatusReturnValue(rp *Reply) error {
 	if rp.Type == ErrorReply {
 		return errors.New(rp.Error)
 	}
@@ -367,7 +367,7 @@ func (r *Redis) okStatusReturnValue(rp *Reply) error {
 	return errors.New(rp.Status)
 }
 
-func (r *Redis) bytesBulkReturnValue(rp *Reply) ([]byte, error) {
+func (r *Redis) BytesBulkReturnValue(rp *Reply) ([]byte, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -377,7 +377,7 @@ func (r *Redis) bytesBulkReturnValue(rp *Reply) ([]byte, error) {
 	return rp.Bulk, nil
 }
 
-func (r *Redis) stringBulkReturnValue(rp *Reply) (string, error) {
+func (r *Redis) StringBulkReturnValue(rp *Reply) (string, error) {
 	if rp.Type == ErrorReply {
 		return "", errors.New(rp.Error)
 	}
@@ -390,7 +390,7 @@ func (r *Redis) stringBulkReturnValue(rp *Reply) (string, error) {
 	return string(rp.Bulk), nil
 }
 
-func (r *Redis) multiReplyReturnValue(rp *Reply) ([]*Reply, error) {
+func (r *Redis) MultiReplyReturnValue(rp *Reply) ([]*Reply, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -400,7 +400,7 @@ func (r *Redis) multiReplyReturnValue(rp *Reply) ([]*Reply, error) {
 	return rp.Multi, nil
 }
 
-func (r *Redis) hashReturnValue(rp *Reply) (map[string]string, error) {
+func (r *Redis) HashReturnValue(rp *Reply) (map[string]string, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -411,11 +411,11 @@ func (r *Redis) hashReturnValue(rp *Reply) (map[string]string, error) {
 	if rp.Multi != nil {
 		length := len(rp.Multi)
 		for i := 0; i < length/2; i++ {
-			key, err := r.stringBulkReturnValue(rp.Multi[i*2])
+			key, err := r.StringBulkReturnValue(rp.Multi[i*2])
 			if err != nil {
 				return nil, err
 			}
-			value, err := r.stringBulkReturnValue(rp.Multi[i*2+1])
+			value, err := r.StringBulkReturnValue(rp.Multi[i*2+1])
 			if err != nil {
 				return nil, err
 			}
@@ -425,7 +425,7 @@ func (r *Redis) hashReturnValue(rp *Reply) (map[string]string, error) {
 	return result, nil
 }
 
-func (r *Redis) listReturnValue(rp *Reply) ([]string, error) {
+func (r *Redis) ListReturnValue(rp *Reply) ([]string, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -435,7 +435,7 @@ func (r *Redis) listReturnValue(rp *Reply) ([]string, error) {
 	var result []string
 	if rp.Multi != nil {
 		for _, subrp := range rp.Multi {
-			item, err := r.stringBulkReturnValue(subrp)
+			item, err := r.StringBulkReturnValue(subrp)
 			if err != nil {
 				return nil, err
 			}
@@ -445,7 +445,7 @@ func (r *Redis) listReturnValue(rp *Reply) ([]string, error) {
 	return result, nil
 }
 
-func (r *Redis) bytesArrayReturnValue(rp *Reply) ([][]byte, error) {
+func (r *Redis) BytesArrayReturnValue(rp *Reply) ([][]byte, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -455,7 +455,7 @@ func (r *Redis) bytesArrayReturnValue(rp *Reply) ([][]byte, error) {
 	var result [][]byte
 	if rp.Multi != nil {
 		for _, subrp := range rp.Multi {
-			b, err := r.bytesBulkReturnValue(subrp)
+			b, err := r.BytesBulkReturnValue(subrp)
 			if err != nil {
 				return nil, err
 			}
@@ -465,7 +465,7 @@ func (r *Redis) bytesArrayReturnValue(rp *Reply) ([][]byte, error) {
 	return result, nil
 }
 
-func (r *Redis) boolArrayReturnValue(rp *Reply) ([]bool, error) {
+func (r *Redis) BoolArrayReturnValue(rp *Reply) ([]bool, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
 	}
@@ -475,7 +475,7 @@ func (r *Redis) boolArrayReturnValue(rp *Reply) ([]bool, error) {
 	var result []bool
 	if rp.Multi != nil {
 		for _, subrp := range rp.Multi {
-			b, err := r.booleanReturnValue(subrp)
+			b, err := r.BooleanReturnValue(subrp)
 			if err != nil {
 				return nil, err
 			}
@@ -487,28 +487,28 @@ func (r *Redis) boolArrayReturnValue(rp *Reply) ([]bool, error) {
 
 // Integer reply: the length of the string after the append operation.
 func (r *Redis) Append(key, value string) (int64, error) {
-	rp, err := r.sendCommand("APPEND", key, value)
+	rp, err := r.SendCommand("APPEND", key, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // If password matches the password in the configuration file,
 // the server replies with the OK status code and starts accepting commands.
 // Otherwise, an error is returned and the clients needs to try a new password.
 func (r *Redis) Auth(password string) error {
-	rp, err := r.sendCommand("AUTH", password)
+	rp, err := r.SendCommand("AUTH", password)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Instruct Redis to start an Append Only File rewrite process.
 // The rewrite will create a small optimized version of the current Append Only File.
 func (r *Redis) BgRewriteAof() error {
-	_, err := r.sendCommand("BGREWRITEAOF")
+	_, err := r.SendCommand("BGREWRITEAOF")
 	return err
 }
 
@@ -517,17 +517,17 @@ func (r *Redis) BgRewriteAof() error {
 // Redis forks, the parent continues to serve the clients, the child saves the DB on disk then exits.
 // A client my be able to check if the operation succeeded using the LASTSAVE command.
 func (r *Redis) BgSave() error {
-	_, err := r.sendCommand("BGSAVE")
+	_, err := r.SendCommand("BGSAVE")
 	return err
 }
 
 // Count the number of set bits (population counting) in a string.
 func (r *Redis) BitCount(key, start, end string) (int64, error) {
-	rp, err := r.sendCommand("BITCOUNT", key, start, end)
+	rp, err := r.SendCommand("BITCOUNT", key, start, end)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Perform a bitwise operation between multiple keys (containing string values) and store the result in the destination key.
@@ -540,11 +540,11 @@ func (r *Redis) BitCount(key, start, end string) (int64, error) {
 // The size of the string stored in the destination key, that is equal to the size of the longest input string.
 func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) {
 	args := packArgs("BITOP", operation, destkey, keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // BLPOP is a blocking list pop primitive.
@@ -557,14 +557,14 @@ func (r *Redis) BitOp(operation, destkey string, keys ...string) (int64, error) 
 // and the second element being the value of the popped element.
 func (r *Redis) BLPop(keys []string, timeout int) ([]string, error) {
 	args := packArgs("BLPOP", keys, timeout)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
 	if rp.Multi == nil {
 		return nil, nil
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // See the BLPOP documentation for the exact semantics,
@@ -572,14 +572,14 @@ func (r *Redis) BLPop(keys []string, timeout int) ([]string, error) {
 // it pops elements from the tail of a list instead of popping from the head.
 func (r *Redis) BRPop(keys []string, timeout int) ([]string, error) {
 	args := packArgs("BRPOP", keys, timeout)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
 	if rp.Multi == nil {
 		return nil, nil
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // BRPOPLPUSH is the blocking variant of RPOPLPUSH.
@@ -590,14 +590,14 @@ func (r *Redis) BRPop(keys []string, timeout int) ([]string, error) {
 // Bulk reply: the element being popped from source and pushed to destination.
 // If timeout is reached, a Null multi-bulk reply is returned.
 func (r *Redis) BRPopLPush(source, destination string, timeout int) ([]byte, error) {
-	rp, err := r.sendCommand("BRPOPLPUSH", source, destination, timeout)
+	rp, err := r.SendCommand("BRPOPLPUSH", source, destination, timeout)
 	if err != nil {
 		return nil, err
 	}
 	if rp.Type == MultiReply {
 		return nil, nil
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // The CLIENT KILL command closes a given client connection identified by ip:port.
@@ -605,11 +605,11 @@ func (r *Redis) BRPopLPush(source, destination string, timeout int) ([]byte, err
 // However, the client will notice the connection has been closed only when the next command is sent (and results in network error).
 // Status code reply: OK if the connection exists and has been closed
 func (r *Redis) ClientKill(ip string, port int) error {
-	rp, err := r.sendCommand("CLIENT", "KILL", net.JoinHostPort(ip, strconv.Itoa(port)))
+	rp, err := r.SendCommand("CLIENT", "KILL", net.JoinHostPort(ip, strconv.Itoa(port)))
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // The CLIENT LIST command returns information and statistics about the client connections server in a mostly human readable format.
@@ -617,31 +617,31 @@ func (r *Redis) ClientKill(ip string, port int) error {
 // One client connection per line (separated by LF)
 // Each line is composed of a succession of property=value fields separated by a space character.
 func (r *Redis) ClientList() (string, error) {
-	rp, err := r.sendCommand("CLIENT", "LIST")
+	rp, err := r.SendCommand("CLIENT", "LIST")
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 // The CLIENT GETNAME returns the name of the current connection as set by CLIENT SETNAME.
 // Since every new connection starts without an associated name,
 // if no name was assigned a null bulk reply is returned.
 func (r *Redis) ClientGetName() ([]byte, error) {
-	rp, err := r.sendCommand("CLIENT", "GETNAME")
+	rp, err := r.SendCommand("CLIENT", "GETNAME")
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // The CLIENT SETNAME command assigns a name to the current connection.
 func (r *Redis) ClientSetName(name string) error {
-	rp, err := r.sendCommand("CLIENT", "SETNAME", name)
+	rp, err := r.SendCommand("CLIENT", "SETNAME", name)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // The CONFIG GET command is used to read the configuration parameters of a running Redis server.
@@ -649,11 +649,11 @@ func (r *Redis) ClientSetName(name string) error {
 // while Redis 2.6 can read the whole configuration of a server using this command.
 // CONFIG GET takes a single argument, which is a glob-style pattern.
 func (r *Redis) ConfigGet(parameter string) (map[string]string, error) {
-	rp, err := r.sendCommand("CONFIG", "GET", parameter)
+	rp, err := r.SendCommand("CONFIG", "GET", parameter)
 	if err != nil {
 		return nil, err
 	}
-	return r.hashReturnValue(rp)
+	return r.HashReturnValue(rp)
 }
 
 // The CONFIG REWRITE command rewrites the redis.conf file the server was started with,
@@ -661,21 +661,21 @@ func (r *Redis) ConfigGet(parameter string) (map[string]string, error) {
 // that may be different compared to the original one because of the use of the CONFIG SET command.
 // Available since 2.8.0.
 func (r *Redis) ConfigRewrite() error {
-	rp, err := r.sendCommand("CONFIG", "REWRITE")
+	rp, err := r.SendCommand("CONFIG", "REWRITE")
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // The CONFIG SET command is used in order to reconfigure the server at run time without the need to restart Redis.
 //  You can change both trivial parameters or switch from one to another persistence option using this command.
 func (r *Redis) ConfigSet(parameter, value string) error {
-	rp, err := r.sendCommand("CONFIG", "SET")
+	rp, err := r.SendCommand("CONFIG", "SET")
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Resets the statistics reported by Redis using the INFO command.
@@ -689,17 +689,17 @@ func (r *Redis) ConfigSet(parameter, value string) error {
 // Latest fork(2) time
 // The aof_delayed_fsync counter
 func (r *Redis) ConfigResetStat() error {
-	_, err := r.sendCommand("CONFIG", "RESETSTAT")
+	_, err := r.SendCommand("CONFIG", "RESETSTAT")
 	return err
 }
 
 // Return the number of keys in the currently-selected database.
 func (r *Redis) DBSize() (int64, error) {
-	rp, err := r.sendCommand("DBSIZE")
+	rp, err := r.SendCommand("DBSIZE")
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 /*
@@ -720,20 +720,20 @@ It is used to simulate bugs during the development.
 // This operation is limited to 64 bit signed integers.
 // Integer reply: the value of key after the decrement
 func (r *Redis) Decr(key string) (int64, error) {
-	rp, err := r.sendCommand("DECR", key)
+	rp, err := r.SendCommand("DECR", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Decrements the number stored at key by decrement.
 func (r *Redis) DecrBy(key string, decrement int) (int64, error) {
-	rp, err := r.sendCommand("DECRBY", key, decrement)
+	rp, err := r.SendCommand("DECRBY", key, decrement)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Removes the specified keys.
@@ -741,84 +741,84 @@ func (r *Redis) DecrBy(key string, decrement int) (int64, error) {
 // Integer reply: The number of keys that were removed.
 func (r *Redis) Del(keys ...string) (int64, error) {
 	args := packArgs("DEL", keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Serialize the value stored at key in a Redis-specific format and return it to the user.
 // The returned value can be synthesized back into a Redis key using the RESTORE command.
 // Return []byte for maybe big data
 func (r *Redis) Dump(key string) ([]byte, error) {
-	rp, err := r.sendCommand("DUMP", key)
+	rp, err := r.SendCommand("DUMP", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 func (r *Redis) Echo(message string) (string, error) {
-	rp, err := r.sendCommand("ECHO", message)
+	rp, err := r.SendCommand("ECHO", message)
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
 	cmds := packArgs("EVAL", script, len(keys), keys, args)
-	return r.sendCommand(cmds...)
+	return r.SendCommand(cmds...)
 }
 
 func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*Reply, error) {
 	cmds := packArgs("EVALSHA", sha1, len(keys), keys, args)
-	return r.sendCommand(cmds...)
+	return r.SendCommand(cmds...)
 }
 
 func (r *Redis) Exists(key string) (bool, error) {
-	rp, err := r.sendCommand("EXISTS", key)
+	rp, err := r.SendCommand("EXISTS", key)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Set a timeout on key.
 // After the timeout has expired, the key will automatically be deleted.
 // A key with an associated timeout is often said to be volatile in Redis terminology.
 func (r *Redis) Expire(key string, seconds int) (bool, error) {
-	rp, err := r.sendCommand("EXPIRE", key, seconds)
+	rp, err := r.SendCommand("EXPIRE", key, seconds)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // EXPIREAT has the same effect and semantic as EXPIRE,
 // but instead of specifying the number of seconds representing the TTL (time to live),
 // it takes an absolute Unix timestamp (seconds since January 1, 1970).
 func (r *Redis) ExpireAt(key string, timestamp int64) (bool, error) {
-	rp, err := r.sendCommand("EXPIREAT", key, timestamp)
+	rp, err := r.SendCommand("EXPIREAT", key, timestamp)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Delete all the keys of all the existing databases,
 // not just the currently selected one.
 // This command never fails.
 func (r *Redis) FlushAll() error {
-	_, err := r.sendCommand("FLUSHALL")
+	_, err := r.SendCommand("FLUSHALL")
 	return err
 }
 
 // Delete all the keys of the currently selected DB.
 // This command never fails.
 func (r *Redis) FlushDB() error {
-	_, err := r.sendCommand("FLUSHDB")
+	_, err := r.SendCommand("FLUSHDB")
 	return err
 }
 
@@ -827,11 +827,11 @@ func (r *Redis) FlushDB() error {
 // An error is returned if the value stored at key is not a string,
 // because GET only handles string values.
 func (r *Redis) Get(key string) ([]byte, error) {
-	rp, err := r.sendCommand("GET", key)
+	rp, err := r.SendCommand("GET", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Returns the bit value at offset in the string value stored at key.
@@ -840,11 +840,11 @@ func (r *Redis) Get(key string) ([]byte, error) {
 // When key does not exist it is assumed to be an empty string,
 // so offset is always out of range and the value is also assumed to be a contiguous space with 0 bits.
 func (r *Redis) GetBit(key string, offset int) (int64, error) {
-	rp, err := r.sendCommand("GETBIT", key, offset)
+	rp, err := r.SendCommand("GETBIT", key, offset)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the substring of the string value stored at key,
@@ -853,21 +853,21 @@ func (r *Redis) GetBit(key string, offset int) (int64, error) {
 // So -1 means the last character, -2 the penultimate and so forth.
 // The function handles out of range requests by limiting the resulting range to the actual length of the string.
 func (r *Redis) GetRange(key string, start, end int) (string, error) {
-	rp, err := r.sendCommand("GETRANGE", start, end)
+	rp, err := r.SendCommand("GETRANGE", start, end)
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 // Atomically sets key to value and returns the old value stored at key.
 // Returns an error when key exists but does not hold a string value.
 func (r *Redis) GetSet(key, value string) (string, error) {
-	rp, err := r.sendCommand("GETSET", key, value)
+	rp, err := r.SendCommand("GETSET", key, value)
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 // Removes the specified fields from the hash stored at key.
@@ -875,42 +875,42 @@ func (r *Redis) GetSet(key, value string) (string, error) {
 // If key does not exist, it is treated as an empty hash and this command returns 0.
 func (r *Redis) HDel(key string, fields ...string) (int64, error) {
 	args := packArgs("HDEL", key, fields)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns if field is an existing field in the hash stored at key.
 func (r *Redis) HExists(key, field string) (bool, error) {
-	rp, err := r.sendCommand("HEXISTS", key, field)
+	rp, err := r.SendCommand("HEXISTS", key, field)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Returns the value associated with field in the hash stored at key.
 // Bulk reply: the value associated with field,
 // or nil when field is not present in the hash or key does not exist.
 func (r *Redis) HGet(key, field string) ([]byte, error) {
-	rp, err := r.sendCommand("HGET", key, field)
+	rp, err := r.SendCommand("HGET", key, field)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Returns all fields and values of the hash stored at key.
 // In the returned value, every field name is followed by its value,
 // so the length of the reply is twice the size of the hash.
 func (r *Redis) HGetAll(key string) (map[string]string, error) {
-	rp, err := r.sendCommand("HGETALL", key)
+	rp, err := r.SendCommand("HGETALL", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.hashReturnValue(rp)
+	return r.HashReturnValue(rp)
 }
 
 // Increments the number stored at field in the hash stored at key by increment.
@@ -918,11 +918,11 @@ func (r *Redis) HGetAll(key string) (map[string]string, error) {
 // If field does not exist the value is set to 0 before the operation is performed.
 // Integer reply: the value at field after the increment operation.
 func (r *Redis) HIncrBy(key, field string, increment int) (int64, error) {
-	rp, err := r.sendCommand("HINCRBY", key, field, increment)
+	rp, err := r.SendCommand("HINCRBY", key, field, increment)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Increment the specified field of an hash stored at key,
@@ -933,11 +933,11 @@ func (r *Redis) HIncrBy(key, field string, increment int) (int64, error) {
 // The current field content or the specified increment are not parsable as a double precision floating point number.
 // Bulk reply: the value of field after the increment.
 func (r *Redis) HIncrByFloat(key, field string, increment float64) (float64, error) {
-	rp, err := r.sendCommand("HINCRBYFLOAT", key, field, increment)
+	rp, err := r.SendCommand("HINCRBYFLOAT", key, field, increment)
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.stringBulkReturnValue(rp)
+	s, err := r.StringBulkReturnValue(rp)
 	if err != nil {
 		return 0.0, err
 	}
@@ -947,21 +947,21 @@ func (r *Redis) HIncrByFloat(key, field string, increment float64) (float64, err
 // eturns all field names in the hash stored at key.
 // Multi-bulk reply: list of fields in the hash, or an empty list when key does not exist.
 func (r *Redis) HKeys(key string) ([]string, error) {
-	rp, err := r.sendCommand("HKEYS", key)
+	rp, err := r.SendCommand("HKEYS", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Returns the number of fields contained in the hash stored at key.
 // Integer reply: number of fields in the hash, or 0 when key does not exist.
 func (r *Redis) HLen(key string) (int64, error) {
-	rp, err := r.sendCommand("HLEN", key)
+	rp, err := r.SendCommand("HLEN", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the values associated with the specified fields in the hash stored at key.
@@ -971,11 +971,11 @@ func (r *Redis) HLen(key string) (int64, error) {
 // Multi-bulk reply: list of values associated with the given fields, in the same order as they are requested.
 func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
 	args := packArgs("HMGET", key, fields)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesArrayReturnValue(rp)
+	return r.BytesArrayReturnValue(rp)
 }
 
 // Sets the specified fields to their respective values in the hash stored at key.
@@ -983,43 +983,43 @@ func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
 // If key does not exist, a new key holding a hash is created.
 func (r *Redis) HMSet(key string, pairs map[string]string) error {
 	args := packArgs("HMSET", key, pairs)
-	rp, err := r.sendCommand(args)
+	rp, err := r.SendCommand(args)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Sets field in the hash stored at key to value.
 // If key does not exist, a new key holding a hash is created.
 // If field already exists in the hash, it is overwritten.
 func (r *Redis) HSet(key, field, value string) (bool, error) {
-	rp, err := r.sendCommand("HSET", key, field, value)
+	rp, err := r.SendCommand("HSET", key, field, value)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Sets field in the hash stored at key to value, only if field does not yet exist.
 // If key does not exist, a new key holding a hash is created.
 // If field already exists, this operation has no effect.
 func (r *Redis) HSetnx(key, field, value string) (bool, error) {
-	rp, err := r.sendCommand("HSETNX", key, field, value)
+	rp, err := r.SendCommand("HSETNX", key, field, value)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Returns all values in the hash stored at key.
 // Multi-bulk reply: list of values in the hash, or an empty list when key does not exist.
 func (r *Redis) HVals(key string) ([]string, error) {
-	rp, err := r.sendCommand("HVALS", key)
+	rp, err := r.SendCommand("HVALS", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Increments the number stored at key by one.
@@ -1028,11 +1028,11 @@ func (r *Redis) HVals(key string) ([]string, error) {
 // or contains a string that can not be represented as integer.
 // Integer reply: the value of key after the increment
 func (r *Redis) Incr(key string) (int64, error) {
-	rp, err := r.sendCommand("INCR", key)
+	rp, err := r.SendCommand("INCR", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Increments the number stored at key by increment.
@@ -1041,20 +1041,20 @@ func (r *Redis) Incr(key string) (int64, error) {
 // or contains a string that can not be represented as integer.
 // Integer reply: the value of key after the increment
 func (r *Redis) IncrBy(key string, increment int) (int64, error) {
-	rp, err := r.sendCommand("INCRBY", key, increment)
+	rp, err := r.SendCommand("INCRBY", key, increment)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Bulk reply: the value of key after the increment.
 func (r *Redis) IncrByFloat(key string, increment float64) (float64, error) {
-	rp, err := r.sendCommand("INCRBYFLOAT", key, increment)
+	rp, err := r.SendCommand("INCRBYFLOAT", key, increment)
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.stringBulkReturnValue(rp)
+	s, err := r.StringBulkReturnValue(rp)
 	if err != nil {
 		return 0.0, err
 	}
@@ -1066,20 +1066,20 @@ func (r *Redis) IncrByFloat(key string, increment float64) (float64, error) {
 // format document at http://redis.io/commands/info
 func (r *Redis) Info(section string) (string, error) {
 	args := packArgs("INFO", section)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 // Returns all keys matching pattern.
 func (r *Redis) Keys(pattern string) ([]string, error) {
-	rp, err := r.sendCommand("KEYS", pattern)
+	rp, err := r.SendCommand("KEYS", pattern)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Return the UNIX TIME of the last DB save executed with success.
@@ -1087,11 +1087,11 @@ func (r *Redis) Keys(pattern string) ([]string, error) {
 // then issuing a BGSAVE command and checking at regular intervals every N seconds if LASTSAVE changed.
 // Integer reply: an UNIX time stamp.
 func (r *Redis) LastSave() (int64, error) {
-	rp, err := r.sendCommand("LASTSAVE")
+	rp, err := r.SendCommand("LASTSAVE")
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the element at index index in the list stored at key.
@@ -1102,11 +1102,11 @@ func (r *Redis) LastSave() (int64, error) {
 // When the value at key is not a list, an error is returned.
 // Bulk reply: the requested element, or nil when index is out of range.
 func (r *Redis) LIndex(key string, index int) ([]byte, error) {
-	rp, err := r.sendCommand("LINDEX", key, index)
+	rp, err := r.SendCommand("LINDEX", key, index)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Inserts value in the list stored at key either before or after the reference value pivot.
@@ -1114,32 +1114,32 @@ func (r *Redis) LIndex(key string, index int) ([]byte, error) {
 // An error is returned when key exists but does not hold a list value.
 // Integer reply: the length of the list after the insert operation, or -1 when the value pivot was not found.
 func (r *Redis) LInsert(key, position, pivot, value string) (int64, error) {
-	rp, err := r.sendCommand("LINSERT", key, position, pivot, value)
+	rp, err := r.SendCommand("LINSERT", key, position, pivot, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the length of the list stored at key.
 // If key does not exist, it is interpreted as an empty list and 0 is returned.
 // An error is returned when the value stored at key is not a list.
 func (r *Redis) LLen(key string) (int64, error) {
-	rp, err := r.sendCommand("LLEN", key)
+	rp, err := r.SendCommand("LLEN", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Removes and returns the first element of the list stored at key.
 // Bulk reply: the value of the first element, or nil when key does not exist.
 func (r *Redis) LPop(key string) ([]byte, error) {
-	rp, err := r.sendCommand("LPOP", key)
+	rp, err := r.SendCommand("LPOP", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Insert all the specified values at the head of the list stored at key.
@@ -1148,11 +1148,11 @@ func (r *Redis) LPop(key string) ([]byte, error) {
 // Integer reply: the length of the list after the push operations.
 func (r *Redis) LPush(key string, values ...string) (int64, error) {
 	args := packArgs("LPUSH", key, values)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Inserts value at the head of the list stored at key,
@@ -1160,11 +1160,11 @@ func (r *Redis) LPush(key string, values ...string) (int64, error) {
 // In contrary to LPUSH, no operation will be performed when key does not yet exist.
 // Integer reply: the length of the list after the push operation.
 func (r *Redis) LPushx(key, value string) (int64, error) {
-	rp, err := r.sendCommand("LPUSHX", key, value)
+	rp, err := r.SendCommand("LPUSHX", key, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the specified elements of the list stored at key.
@@ -1180,11 +1180,11 @@ func (r *Redis) LPushx(key, value string) (int64, error) {
 // If stop is larger than the actual end of the list, Redis will treat it like the last element of the list.
 // Multi-bulk reply: list of elements in the specified range.
 func (r *Redis) LRange(key string, start, end int) ([]string, error) {
-	rp, err := r.sendCommand("LRANGE", key, start, end)
+	rp, err := r.SendCommand("LRANGE", key, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Removes the first count occurrences of elements equal to value from the list stored at key.
@@ -1194,31 +1194,31 @@ func (r *Redis) LRange(key string, start, end int) ([]string, error) {
 // count = 0: Remove all elements equal to value.
 // Integer reply: the number of removed elements.
 func (r *Redis) LRem(key string, count int, value string) (int64, error) {
-	rp, err := r.sendCommand("LREM", key, count, value)
+	rp, err := r.SendCommand("LREM", key, count, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Sets the list element at index to value. For more information on the index argument, see LINDEX.
 // An error is returned for out of range indexes.
 func (r *Redis) LSet(key string, index int, value string) error {
-	rp, err := r.sendCommand("LSET", key, index, value)
+	rp, err := r.SendCommand("LSET", key, index, value)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Trim an existing list so that it will contain only the specified range of elements specified.
 // Both start and stop are zero-based indexes, where 0 is the first element of the list (the head), 1 the next element and so on.
 func (r *Redis) LTrim(key string, start, stop int) error {
-	rp, err := r.sendCommand("LTRIM", key, start, stop)
+	rp, err := r.SendCommand("LTRIM", key, start, stop)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Returns the values of all specified keys.
@@ -1227,22 +1227,22 @@ func (r *Redis) LTrim(key string, start, stop int) error {
 // Multi-bulk reply: list of values at the specified keys.
 func (r *Redis) MGet(keys ...string) ([][]byte, error) {
 	args := packArgs("MGET", keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesArrayReturnValue(rp)
+	return r.BytesArrayReturnValue(rp)
 }
 
 // Move key from the currently selected database (see SELECT) to the specified destination database.
 // When key already exists in the destination database,
 // or it does not exist in the source database, it does nothing.
 func (r *Redis) Move(key string, db int) (bool, error) {
-	rp, err := r.sendCommand("MOVE", key, db)
+	rp, err := r.SendCommand("MOVE", key, db)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Sets the given keys to their respective values.
@@ -1250,7 +1250,7 @@ func (r *Redis) Move(key string, db int) (bool, error) {
 // See MSETNX if you don't want to overwrite existing values.
 func (r *Redis) MSet(pairs map[string]string) error {
 	args := packArgs("MSET", pairs)
-	_, err := r.sendCommand(args...)
+	_, err := r.SendCommand(args...)
 	return err
 }
 
@@ -1260,11 +1260,11 @@ func (r *Redis) MSet(pairs map[string]string) error {
 // False if no key was set (at least one key already existed).
 func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
 	args := packArgs("MSETNX", pairs)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 /*
@@ -1280,62 +1280,62 @@ when using Redis as a Cache.
 // True if the timeout was removed.
 // False if key does not exist or does not have an associated timeout.
 func (r *Redis) Persist(key string) (bool, error) {
-	rp, err := r.sendCommand("PERSIST", key)
+	rp, err := r.SendCommand("PERSIST", key)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // This command works exactly like EXPIRE but the time to live of the key is specified in milliseconds instead of seconds.
 func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
-	rp, err := r.sendCommand("PEXPIRE", key, milliseconds)
+	rp, err := r.SendCommand("PEXPIRE", key, milliseconds)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // PEXPIREAT has the same effect and semantic as EXPIREAT,
 // but the Unix time at which the key will expire is specified in milliseconds instead of seconds.
 func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
-	rp, err := r.sendCommand("PEXPIREAT", key, timestamp)
+	rp, err := r.SendCommand("PEXPIREAT", key, timestamp)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Returns PONG. This command is often used to test if a connection is still alive, or to measure latency.
 func (r *Redis) Ping() error {
-	_, err := r.sendCommand("PING")
+	_, err := r.SendCommand("PING")
 	return err
 }
 
 // PSETEX works exactly like SETEX with the sole difference that the expire time is specified in milliseconds instead of seconds.
 func (r *Redis) PSetex(key string, milliseconds int, value string) error {
-	_, err := r.sendCommand("PSETEX", key, milliseconds, value)
+	_, err := r.SendCommand("PSETEX", key, milliseconds, value)
 	return err
 }
 
 // Like TTL this command returns the remaining time to live of a key that has an expire set,
 // with the sole difference that TTL returns the amount of remaining time in seconds while PTTL returns it in milliseconds.
 func (r *Redis) PTTL(key string) (int64, error) {
-	rp, err := r.sendCommand("PTTL", key)
+	rp, err := r.SendCommand("PTTL", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Posts a message to the given channel.
 // Integer reply: the number of clients that received the message.
 func (r *Redis) Publish(channel, message string) (int64, error) {
-	rp, err := r.sendCommand("PUBLISH", channel, message)
+	rp, err := r.SendCommand("PUBLISH", channel, message)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 func (r *Redis) PubSub() (*PubSub, error) {
@@ -1345,18 +1345,18 @@ func (r *Redis) PubSub() (*PubSub, error) {
 // Ask the server to close the connection.
 // The connection is closed as soon as all pending replies have been written to the client.
 func (r *Redis) Quit() error {
-	_, err := r.sendCommand("QUIT")
+	_, err := r.SendCommand("QUIT")
 	return err
 }
 
 // Return a random key from the currently selected database.
 // Bulk reply: the random key, or nil when the database is empty.
 func (r *Redis) RandomKey() ([]byte, error) {
-	rp, err := r.sendCommand("RANDOMKEY")
+	rp, err := r.SendCommand("RANDOMKEY")
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Renames key to newkey.
@@ -1364,42 +1364,42 @@ func (r *Redis) RandomKey() ([]byte, error) {
 // If newkey already exists it is overwritten, when this happens RENAME executes an implicit DEL operation,
 // so if the deleted key contains a very big value it may cause high latency even if RENAME itself is usually a constant-time operation.
 func (r *Redis) Rename(key, newkey string) error {
-	rp, err := r.sendCommand("RENAME", key, newkey)
+	rp, err := r.SendCommand("RENAME", key, newkey)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Renames key to newkey if newkey does not yet exist.
 // It returns an error under the same conditions as RENAME.
 func (r *Redis) Renamenx(key, newkey string) (bool, error) {
-	rp, err := r.sendCommand("RENAMENX", key, newkey)
+	rp, err := r.SendCommand("RENAMENX", key, newkey)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Create a key associated with a value that is obtained by deserializing the provided serialized value (obtained via DUMP).
 // If ttl is 0 the key is created without any expire, otherwise the specified expire time (in milliseconds) is set.
 // RESTORE checks the RDB version and data checksum. If they don't match an error is returned.
 func (r *Redis) Restore(key string, ttl int, serialized string) error {
-	rp, err := r.sendCommand("RESTORE", key, ttl, serialized)
+	rp, err := r.SendCommand("RESTORE", key, ttl, serialized)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Removes and returns the last element of the list stored at key.
 // Bulk reply: the value of the last element, or nil when key does not exist.
 func (r *Redis) RPop(key string) ([]byte, error) {
-	rp, err := r.sendCommand("RPOP", key)
+	rp, err := r.SendCommand("RPOP", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Atomically returns and removes the last element (tail) of the list stored at source,
@@ -1410,11 +1410,11 @@ func (r *Redis) RPop(key string) ([]byte, error) {
 // the operation is equivalent to removing the last element from the list and pushing it as first element of the list,
 // so it can be considered as a list rotation command.
 func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
-	rp, err := r.sendCommand("RPOPLPUSH", source, destination)
+	rp, err := r.SendCommand("RPOPLPUSH", source, destination)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // Insert all the specified values at the tail of the list stored at key.
@@ -1422,22 +1422,22 @@ func (r *Redis) RPopLPush(source, destination string) ([]byte, error) {
 // When key holds a value that is not a list, an error is returned.
 func (r *Redis) RPush(key string, values ...string) (int64, error) {
 	args := packArgs("RPUSH", key, values)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Inserts value at the tail of the list stored at key,
 // only if key already exists and holds a list.
 // In contrary to RPUSH, no operation will be performed when key does not yet exist.
 func (r *Redis) RPushx(key, value string) (int64, error) {
-	rp, err := r.sendCommand("RPUSHX", key, value)
+	rp, err := r.SendCommand("RPUSHX", key, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Add the specified members to the set stored at key.
@@ -1449,11 +1449,11 @@ func (r *Redis) RPushx(key, value string) (int64, error) {
 // not including all the elements already present into the set.
 func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 	args := packArgs("SADD", key, members)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // The SAVE commands performs a synchronous save of the dataset producing a point in time snapshot of all the data inside the Redis instance,
@@ -1461,20 +1461,20 @@ func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 //
 // You almost never want to call SAVE in production environments where it will block all the other clients. Instead usually BGSAVE is used.
 func (r *Redis) Save() error {
-	rp, err := r.sendCommand("SAVE")
+	rp, err := r.SendCommand("SAVE")
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Returns the set cardinality (number of elements) of the set stored at key.
 func (r *Redis) SCard(key string) (int64, error) {
-	rp, err := r.sendCommand("SCARD", key)
+	rp, err := r.SendCommand("SCARD", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns information about the existence of the scripts in the script cache.
@@ -1482,30 +1482,30 @@ func (r *Redis) SCard(key string) (int64, error) {
 // For every corresponding SHA1 digest of a script that actually exists in the script cache.
 func (r *Redis) ScriptExists(scripts ...string) ([]bool, error) {
 	args := packArgs("SCRIPT", "EXISTS", scripts)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.boolArrayReturnValue(rp)
+	return r.BoolArrayReturnValue(rp)
 }
 
 // Flush the Lua scripts cache.
 // Please refer to the EVAL documentation for detailed information about Redis Lua scripting.
 func (r *Redis) ScriptFlush() error {
-	rp, err := r.sendCommand("SCRIPT", "FLUSH")
+	rp, err := r.SendCommand("SCRIPT", "FLUSH")
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Kills the currently executing Lua script, assuming no write operation was yet performed by the script.
 func (r *Redis) ScriptKill() error {
-	rp, err := r.sendCommand("SCRIPT", "KILL")
+	rp, err := r.SendCommand("SCRIPT", "KILL")
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Load a script into the scripts cache, without executing it.
@@ -1513,11 +1513,11 @@ func (r *Redis) ScriptKill() error {
 // exactly like after the first successful invocation of EVAL.
 // Bulk reply This command returns the SHA1 digest of the script added into the script cache.
 func (r *Redis) ScriptLoad(script string) (string, error) {
-	rp, err := r.sendCommand("SCRIPT", "LOAD", script)
+	rp, err := r.SendCommand("SCRIPT", "LOAD", script)
 	if err != nil {
 		return "", err
 	}
-	return r.stringBulkReturnValue(rp)
+	return r.StringBulkReturnValue(rp)
 }
 
 // Returns the members of the set resulting from the difference between the first set and all the successive sets.
@@ -1525,11 +1525,11 @@ func (r *Redis) ScriptLoad(script string) (string, error) {
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	args := packArgs("SDIFF", keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Set key to hold the string value.
@@ -1548,49 +1548,49 @@ func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, m
 	} else if must_not_exists {
 		args = append(args, "NX")
 	}
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Sets or clears the bit at offset in the string value stored at key.
 // Integer reply: the original bit value stored at offset.
 func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
-	rp, err := r.sendCommand("SETBIT", key, offset, value)
+	rp, err := r.SendCommand("SETBIT", key, offset, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Set key to hold the string value and set key to timeout after a given number of seconds.
 func (r *Redis) Setex(key string, seconds int, value string) error {
-	rp, err := r.sendCommand("SETEX", key, seconds, value)
+	rp, err := r.SendCommand("SETEX", key, seconds, value)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Set key to hold string value if key does not exist.
 func (r *Redis) Setnx(key, value string) (bool, error) {
-	rp, err := r.sendCommand("SETNX", key, value)
+	rp, err := r.SendCommand("SETNX", key, value)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // Overwrites part of the string stored at key, starting at the specified offset, for the entire length of value.
 // Integer reply: the length of the string after it was modified by the command.
 func (r *Redis) SetRange(key string, offset int, value string) (int64, error) {
-	rp, err := r.sendCommand("SETRANGE", key, offset, value)
+	rp, err := r.SendCommand("SETRANGE", key, offset, value)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // The command behavior is the following:
@@ -1605,7 +1605,7 @@ func (r *Redis) Shutdown(save, no_save bool) error {
 	} else if no_save {
 		args = append(args, "NOSAVE")
 	}
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err == io.EOF {
 		return nil
 	}
@@ -1619,11 +1619,11 @@ func (r *Redis) Shutdown(save, no_save bool) error {
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SInter(keys ...string) ([]string, error) {
 	args := packArgs("SINTER", keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // This command is equal to SINTER, but instead of returning the resulting set, it is stored in destination.
@@ -1631,20 +1631,20 @@ func (r *Redis) SInter(keys ...string) ([]string, error) {
 // Integer reply: the number of elements in the resulting set.
 func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
 	args := packArgs("SINTERSTORE", destination, keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns if member is a member of the set stored at key.
 func (r *Redis) SIsMember(key, member string) (bool, error) {
-	rp, err := r.sendCommand("SISMEMBER", key, member)
+	rp, err := r.SendCommand("SISMEMBER", key, member)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 // The SLAVEOF command can change the replication settings of a slave on the fly.
@@ -1658,30 +1658,30 @@ func (r *Redis) SIsMember(key, member string) (bool, error) {
 // So, if the old master stops working, it is possible to turn the slave into a master and set the application to use this new master in read/write.
 // Later when the other Redis server is fixed, it can be reconfigured to work as a slave.
 func (r *Redis) SlaveOf(host, port string) error {
-	rp, err := r.sendCommand("SLAVEOF", host, port)
+	rp, err := r.SendCommand("SLAVEOF", host, port)
 	if err != nil {
 		return err
 	}
-	return r.okStatusReturnValue(rp)
+	return r.OKStatusReturnValue(rp)
 }
 
 // Returns all the members of the set value stored at key.
 func (r *Redis) SMembers(key string) ([]string, error) {
-	rp, err := r.sendCommand("SMEMBERS", key)
+	rp, err := r.SendCommand("SMEMBERS", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Move member from the set at source to the set at destination. This operation is atomic.
 // In every given moment the element will appear to be a member of source or destination for other clients.
 func (r *Redis) SMove(source, destination, member string) (bool, error) {
-	rp, err := r.sendCommand("SMOVE", source, destination, member)
+	rp, err := r.SendCommand("SMOVE", source, destination, member)
 	if err != nil {
 		return false, err
 	}
-	return r.booleanReturnValue(rp)
+	return r.BooleanReturnValue(rp)
 }
 
 /*
@@ -1691,21 +1691,21 @@ SORT key [BY pattern] [LIMIT offset count] [GET pattern [GET pattern ...]] [ASC|
 // Removes and returns a random element from the set value stored at key.
 // Bulk reply: the removed element, or nil when key does not exist.
 func (r *Redis) SPop(key string) ([]byte, error) {
-	rp, err := r.sendCommand("SPOP", key)
+	rp, err := r.SendCommand("SPOP", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // When called with just the key argument, return a random element from the set value stored at key.
 // Bulk reply: the command returns a Bulk Reply with the randomly selected element, or nil when key does not exist.
 func (r *Redis) SRandMember(key string) ([]byte, error) {
-	rp, err := r.sendCommand("SRANDMEMBER", key)
+	rp, err := r.SendCommand("SRANDMEMBER", key)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 // return an array of count distinct elements if count is positive.
@@ -1713,11 +1713,11 @@ func (r *Redis) SRandMember(key string) ([]byte, error) {
 // In this case the numer of returned elements is the absolute value of the specified count.
 // returns an array of elements, or an empty array when key does not exist.
 func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
-	rp, err := r.sendCommand("SRANDMEMBER", key, count)
+	rp, err := r.SendCommand("SRANDMEMBER", key, count)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesArrayReturnValue(rp)
+	return r.BytesArrayReturnValue(rp)
 }
 
 // Remove the specified members from the set stored at key.
@@ -1727,44 +1727,44 @@ func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
 // Integer reply: the number of members that were removed from the set, not including non existing members.
 func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	args := packArgs("SREM", key, members)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the length of the string value stored at key.
 // An error is returned when key holds a non-string value.
 // Integer reply: the length of the string at key, or 0 when key does not exist.
 func (r *Redis) StrLen(key string) (int64, error) {
-	rp, err := r.sendCommand("STRLEN", key)
+	rp, err := r.SendCommand("STRLEN", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the members of the set resulting from the union of all the given sets.
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	args := packArgs("SUNION", keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // If destination already exists, it is overwritten.
 // Integer reply: the number of elements in the resulting set.
 func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 	args := packArgs("SUNIONSTORE", destination, keys)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 /*
@@ -1775,32 +1775,32 @@ SYNC
 // unix time in seconds.
 // microseconds.
 func (r *Redis) Time() ([]string, error) {
-	rp, err := r.sendCommand("TIME")
+	rp, err := r.SendCommand("TIME")
 	if err != nil {
 		return nil, err
 	}
-	return r.listReturnValue(rp)
+	return r.ListReturnValue(rp)
 }
 
 // Returns the remaining time to live of a key that has a timeout.
 // Integer reply: TTL in seconds, or a negative value in order to signal an error (see the description above).
 func (r *Redis) TTL(key string) (int64, error) {
-	rp, err := r.sendCommand("TTL", key)
+	rp, err := r.SendCommand("TTL", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the string representation of the type of the value stored at key.
 // The different types that can be returned are: string, list, set, zset and hash.
 // Status code reply: type of key, or none when key does not exist.
 func (r *Redis) Type(key string) (string, error) {
-	rp, err := r.sendCommand("TYPE", key)
+	rp, err := r.SendCommand("TYPE", key)
 	if err != nil {
 		return "", err
 	}
-	return r.statusReturnValue(rp)
+	return r.StatusReturnValue(rp)
 }
 
 // Adds all the specified members with the specified scores to the sorted set stored at key.
@@ -1813,32 +1813,32 @@ func (r *Redis) Type(key string) (string, error) {
 // The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
 func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
 	args := packArgs("ZADD", key, pairs)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
 // Integer reply: the cardinality (number of elements) of the sorted set, or 0 if key does not exist.
 func (r *Redis) ZCard(key string) (int64, error) {
-	rp, err := r.sendCommand("ZCARD", key)
+	rp, err := r.SendCommand("ZCARD", key)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Returns the number of elements in the sorted set at key with a score between min and max.
 // The min and max arguments have the same semantic as described for ZRANGEBYSCORE.
 // Integer reply: the number of elements in the specified score range.
 func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
-	rp, err := r.sendCommand("ZCOUNT", key, min, max)
+	rp, err := r.SendCommand("ZCOUNT", key, min, max)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Increments the score of member in the sorted set stored at key by increment.
@@ -1848,11 +1848,11 @@ func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
 // An error is returned when key exists but does not hold a sorted set.
 // Bulk reply: the new score of member (a double precision floating point number), represented as string.
 func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, error) {
-	rp, err := r.sendCommand("ZINCRBY", key, increment, member)
+	rp, err := r.SendCommand("ZINCRBY", key, increment, member)
 	if err != nil {
 		return 0.0, err
 	}
-	s, err := r.stringBulkReturnValue(rp)
+	s, err := r.StringBulkReturnValue(rp)
 	if err != nil {
 		return 0.0, err
 	}
@@ -1885,11 +1885,11 @@ ZRANK key member
 // The number of members removed from the sorted set, not including non existing members.
 func (r *Redis) ZRem(key string, members ...string) (int64, error) {
 	args := packArgs("ZREM", key, members)
-	rp, err := r.sendCommand(args...)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Removes all elements in the sorted set stored at key with rank between start and stop.
@@ -1898,21 +1898,21 @@ func (r *Redis) ZRem(key string, members ...string) (int64, error) {
 // For example: -1 is the element with the highest score, -2 the element with the second highest score and so forth.
 // Integer reply: the number of elements removed.
 func (r *Redis) ZRemRangeByRank(key string, start, stop int) (int64, error) {
-	rp, err := r.sendCommand("ZREMRANGEBYRANK", key, start, stop)
+	rp, err := r.SendCommand("ZREMRANGEBYRANK", key, start, stop)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 // Removes all elements in the sorted set stored at key with a score between min and max (inclusive).
 // Integer reply: the number of elements removed.
 func (r *Redis) ZRemRangeByScore(key string, min, max int) (int64, error) {
-	rp, err := r.sendCommand("ZREMRANGEBYSCORE", key, min, max)
+	rp, err := r.SendCommand("ZREMRANGEBYSCORE", key, min, max)
 	if err != nil {
 		return 0, err
 	}
-	return r.integerReturnValue(rp)
+	return r.IntegerReturnValue(rp)
 }
 
 /*
@@ -1923,11 +1923,11 @@ ZREVRANGE key start stop [WITHSCORES]
 // If member does not exist in the sorted set, or key does not exist, nil is returned.
 // Bulk reply: the score of member (a double precision floating point number), represented as string.
 func (r *Redis) ZScore(key, member string) ([]byte, error) {
-	rp, err := r.sendCommand("ZSCORE", key, member)
+	rp, err := r.SendCommand("ZSCORE", key, member)
 	if err != nil {
 		return nil, err
 	}
-	return r.bytesBulkReturnValue(rp)
+	return r.BytesBulkReturnValue(rp)
 }
 
 /*
@@ -1956,10 +1956,10 @@ func (r *Redis) Transaction() (*Transaction, error) {
 
 type Transaction struct {
 	redis *Redis
-	c     *connection
+	c     *Connection
 }
 
-func newTransaction(r *Redis, c *connection) (*Transaction, error) {
+func newTransaction(r *Redis, c *Connection) (*Transaction, error) {
 	t := &Transaction{
 		redis: r,
 		c:     c,
@@ -1973,47 +1973,47 @@ func newTransaction(r *Redis, c *connection) (*Transaction, error) {
 }
 
 func (t *Transaction) multi() error {
-	if err := t.c.sendCommand("MULTI"); err != nil {
+	if err := t.c.SendCommand("MULTI"); err != nil {
 		return err
 	}
-	_, err := t.c.recvReply()
+	_, err := t.c.RecvReply()
 	return err
 }
 
 func (t *Transaction) Discard() error {
-	if err := t.c.sendCommand("DISCARD"); err != nil {
+	if err := t.c.SendCommand("DISCARD"); err != nil {
 		return err
 	}
-	_, err := t.c.recvReply()
+	_, err := t.c.RecvReply()
 	return err
 }
 
 func (t *Transaction) Watch(keys ...string) error {
 	args := packArgs("WATCH", keys)
-	if err := t.c.sendCommand(args...); err != nil {
+	if err := t.c.SendCommand(args...); err != nil {
 		return err
 	}
-	_, err := t.c.recvReply()
+	_, err := t.c.RecvReply()
 	return err
 }
 
 func (t *Transaction) UnWatch() error {
-	if err := t.c.sendCommand("UNWATCH"); err != nil {
+	if err := t.c.SendCommand("UNWATCH"); err != nil {
 		return err
 	}
-	_, err := t.c.recvReply()
+	_, err := t.c.RecvReply()
 	return err
 }
 
 func (t *Transaction) Exec() ([]*Reply, error) {
-	if err := t.c.sendCommand("EXEC"); err != nil {
+	if err := t.c.SendCommand("EXEC"); err != nil {
 		return nil, err
 	}
-	rp, err := t.c.recvReply()
+	rp, err := t.c.RecvReply()
 	if err != nil {
 		return nil, err
 	}
-	return t.redis.multiReplyReturnValue(rp)
+	return t.redis.MultiReplyReturnValue(rp)
 }
 
 func (t *Transaction) Close() {
@@ -2022,14 +2022,14 @@ func (t *Transaction) Close() {
 
 func (t *Transaction) Command(args ...interface{}) error {
 	args2 := packArgs(args...)
-	if err := t.c.sendCommand(args2...); err != nil {
+	if err := t.c.SendCommand(args2...); err != nil {
 		return err
 	}
-	rp, err := t.c.recvReply()
+	rp, err := t.c.RecvReply()
 	if err != nil {
 		return err
 	}
-	s, err := t.redis.statusReturnValue(rp)
+	s, err := t.redis.StatusReturnValue(rp)
 	if err != nil {
 		return err
 	}
@@ -2041,7 +2041,7 @@ func (t *Transaction) Command(args ...interface{}) error {
 
 type PubSub struct {
 	redis *Redis
-	c     *connection
+	c     *Connection
 	msg   chan interface{}
 }
 
@@ -2061,7 +2061,7 @@ func newPubSub(r *Redis) (*PubSub, error) {
 
 func (p *PubSub) waitMsg() {
 	for {
-		rp, err := p.c.recvReply()
+		rp, err := p.c.RecvReply()
 		if err != nil {
 			p.msg <- err
 			break
@@ -2072,7 +2072,7 @@ func (p *PubSub) waitMsg() {
 
 func (p *PubSub) Close() error {
 	close(p.msg)
-	return p.c.conn.Close()
+	return p.c.Conn.Close()
 }
 
 func (p *PubSub) Message() <-chan interface{} {
@@ -2081,20 +2081,20 @@ func (p *PubSub) Message() <-chan interface{} {
 
 func (p *PubSub) Subscribe(channels ...string) error {
 	args := packArgs("SUBSCRIBE", channels)
-	return p.c.sendCommand(args...)
+	return p.c.SendCommand(args...)
 }
 
 func (p *PubSub) PSubscribe(patterns ...string) error {
 	args := packArgs("PSUBSCRIBE", patterns)
-	return p.c.sendCommand(args...)
+	return p.c.SendCommand(args...)
 }
 
 func (p *PubSub) UnSubscribe(channels ...string) error {
 	args := packArgs("UNSUBSCRIBE", channels)
-	return p.c.sendCommand(args...)
+	return p.c.SendCommand(args...)
 }
 
 func (p *PubSub) PUnSubscribe(patterns ...string) error {
 	args := packArgs("PUNSUBSCRIBE", patterns)
-	return p.c.sendCommand(args...)
+	return p.c.SendCommand(args...)
 }
