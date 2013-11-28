@@ -207,3 +207,39 @@ func TestHGetAll(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestHMGet(t *testing.T) {
+	r, _ := dial()
+	r.Del("key")
+	r.HSet("key", "field", "value")
+	data, err := r.HMGet("key", "field", "nofield")
+	if err != nil {
+		t.Error(err)
+	}
+	if string(data[0]) != "value" {
+		t.Fail()
+	}
+	if data[1] != nil {
+		t.Fail()
+	}
+}
+
+func TestKeys(t *testing.T) {
+	r, _ := dial()
+	r.FlushDB()
+	keys, err := r.Keys("*")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(keys) != 0 {
+		t.Fail()
+	}
+	r.Set("key", "value", 0, 0, false, false)
+	keys, err = r.Keys("*")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(keys) != 1 || keys[0] != "key" {
+		t.Fail()
+	}
+}
