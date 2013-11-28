@@ -266,3 +266,10 @@ func TestTransaction(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestPublish(t *testing.T) {
+	r, _ := dial()
+	if _, err := r.Publish("key", "value"); err != nil {
+		t.Error(err)
+	}
+}
