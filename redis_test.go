@@ -139,7 +139,7 @@ func TestEval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := rp.OKStatusValue(); err != nil {
+	if err := rp.OKValue(); err != nil {
 		t.Error(err)
 	}
 	rp, err = r.Eval("return 10", nil, nil)
@@ -163,7 +163,7 @@ func TestEval(t *testing.T) {
 	if rp.Multi[2].Multi[0].Integer != 3 {
 		t.Fail()
 	}
-	if s, err := rp.Multi[2].Multi[1].StringBulkValue(); err != nil || s != "Hello World!" {
+	if s, err := rp.Multi[2].Multi[1].StringValue(); err != nil || s != "Hello World!" {
 		t.Fail()
 	}
 }
@@ -188,6 +188,22 @@ func TestGet(t *testing.T) {
 		t.Error(err)
 	}
 	if data != nil {
+		t.Fail()
+	}
+}
+
+func TestHGetAll(t *testing.T) {
+	r, _ := dial()
+	r.Del("key")
+	pairs := map[string]string{"name": "foo", "attr": "bar"}
+	if err := r.HMSet("key", pairs); err != nil {
+		t.Error(err)
+	}
+	data, err := r.HGetAll("key")
+	if err != nil {
+		t.Error(err)
+	}
+	if data["name"] != "foo" {
 		t.Fail()
 	}
 }

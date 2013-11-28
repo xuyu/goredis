@@ -983,7 +983,7 @@ func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
 // If key does not exist, a new key holding a hash is created.
 func (r *Redis) HMSet(key string, pairs map[string]string) error {
 	args := packArgs("HMSET", key, pairs)
-	rp, err := r.SendCommand(args)
+	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return err
 	}
