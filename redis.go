@@ -494,6 +494,7 @@ func (r *Redis) SendCommand(args ...interface{}) (*Reply, error) {
 		if err = c.SendCommand(args...); err != nil {
 			return nil, err
 		}
+		return c.RecvReply()
 	}
 	return rp, err
 }
