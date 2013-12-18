@@ -350,7 +350,7 @@ func (c *Connection) readBulk(size int) ([]byte, error) {
 		return nil, nil
 	}
 	buf := make([]byte, size+2)
-	if _, err := c.Reader.Read(buf); err != nil {
+	if _, err := io.ReadFull(c.Reader, buf); err != nil {
 		return nil, err
 	}
 	return buf[:size], nil
