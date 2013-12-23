@@ -1782,7 +1782,7 @@ func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 }
 
 /*
-SYNC
+SYNC Internal command used for replication
 */
 
 // A multi bulk reply containing two elements:
@@ -1881,17 +1881,50 @@ func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, 
 ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 */
 
-/*
-ZRANGE key start stop [WITHSCORES]
-*/
+// Returns the specified range of elements in the sorted set stored at key.
+// The elements are considered to be ordered from the lowest to the highest score.
+// Lexicographical order is used for elements with equal score.
+// Multi-bulk reply: list of elements in the specified range.(optionally with their scores).
+// It is possible to pass the WITHSCORES option in order to return the scores of the elements together with the elements.
+// The returned list will contain value1,score1,...,valueN,scoreN instead of value1,...,valueN.
+func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, error) {
+	args := []interface{}{"ZRANGE", key, start, stop}
+	if withscores {
+		args = append(args, "WITHSCORES")
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.ListValue()
+}
 
 /*
 ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 */
 
-/*
-ZRANK key member
-*/
+// Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
+// The rank (or index) is 0-based, which means that the member with the lowest score has rank 0.
+//
+// If member exists in the sorted set, Integer reply: the rank of member.
+// If member does not exist in the sorted set or key does not exist, Bulk reply: nil.
+// -1 represent the nil bulk rely.
+func (r *Redis) ZRank(key, member string) (int64, error) {
+	rp, err := r.SendCommand("ZRANK", key, member)
+	if err != nil {
+		return -1, err
+	}
+	if rp.Type == ErrorReply {
+		return -1, errors.New(rp.Error)
+	}
+	if rp.Type == IntegerReply {
+		return rp.Integer, nil
+	}
+	if rp.Type == BulkReply {
+		return -1, nil
+	}
+	return -1, errors.New("ZRANK reply protocol error")
+}
 
 // Removes the specified members from the sorted set stored at key. Non existing members are ignored.
 // An error is returned when key exists and does not hold a sorted set.
@@ -1929,9 +1962,45 @@ func (r *Redis) ZRemRangeByScore(key string, min, max int) (int64, error) {
 	return rp.IntegerValue()
 }
 
+// Returns the specified range of elements in the sorted set stored at key.
+// The elements are considered to be ordered from the highest to the lowest score.
+// Descending lexicographical order is used for elements with equal score.
+// Multi-bulk reply: list of elements in the specified range (optionally with their scores).
+func (r *Redis) ZRevRange(key string, start, stop int, withscores bool) ([]string, error) {
+	args := []interface{}{"ZREVRANGE", key, start, stop}
+	if withscores {
+		args = append(args, "WITHSCORES")
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.ListValue()
+}
+
 /*
-ZREVRANGE key start stop [WITHSCORES]
+ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
 */
+
+// Returns the rank of member in the sorted set stored at key,
+// with the scores ordered from high to low. The rank (or index) is 0-based,
+// which means that the member with the highest score has rank 0.
+func (r *Redis) ZRevRank(key, member string) (int64, error) {
+	rp, err := r.SendCommand("ZREVRANK", key, member)
+	if err != nil {
+		return -1, err
+	}
+	if rp.Type == ErrorReply {
+		return -1, errors.New(rp.Error)
+	}
+	if rp.Type == IntegerReply {
+		return rp.Integer, nil
+	}
+	if rp.Type == BulkReply {
+		return -1, nil
+	}
+	return -1, errors.New("ZREVRANK reply protocol error")
+}
 
 // Returns the score of member in the sorted set at key.
 // If member does not exist in the sorted set, or key does not exist, nil is returned.
