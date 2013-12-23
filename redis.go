@@ -536,7 +536,7 @@ func (r *Redis) BgSave() error {
 }
 
 // Count the number of set bits (population counting) in a string.
-func (r *Redis) BitCount(key, start, end string) (int64, error) {
+func (r *Redis) BitCount(key string, start, end int) (int64, error) {
 	rp, err := r.SendCommand("BITCOUNT", key, start, end)
 	if err != nil {
 		return 0, err
