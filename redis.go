@@ -15,7 +15,7 @@
 //
 // A Multi bulk reply is used to return an array of other replies.
 // Every element of a Multi Bulk Reply can be of any kind, including a nested Multi Bulk Reply.
-package redis
+package goredis
 
 import (
 	"bufio"
@@ -449,16 +449,24 @@ func (r *Redis) openConnection() (*Connection, error) {
 		if err := c.SendCommand("AUTH", r.password); err != nil {
 			return nil, err
 		}
-		if _, err := c.RecvReply(); err != nil {
+		rp, err := c.RecvReply()
+		if err != nil {
 			return nil, err
+		}
+		if rp.Type == ErrorReply {
+			return nil, errors.New(rp.Error)
 		}
 	}
 	if r.db > 0 {
 		if err := c.SendCommand("SELECT", r.db); err != nil {
 			return nil, err
 		}
-		if _, err := c.RecvReply(); err != nil {
+		rp, err := c.RecvReply()
+		if err != nil {
 			return nil, err
+		}
+		if rp.Type == ErrorReply {
+			return nil, errors.New(rp.Error)
 		}
 	}
 	return c, nil
