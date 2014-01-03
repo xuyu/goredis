@@ -875,7 +875,7 @@ func (r *Redis) GetBit(key string, offset int) (int64, error) {
 // So -1 means the last character, -2 the penultimate and so forth.
 // The function handles out of range requests by limiting the resulting range to the actual length of the string.
 func (r *Redis) GetRange(key string, start, end int) (string, error) {
-	rp, err := r.SendCommand("GETRANGE", start, end)
+	rp, err := r.SendCommand("GETRANGE", key, start, end)
 	if err != nil {
 		return "", err
 	}
