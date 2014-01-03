@@ -1256,6 +1256,35 @@ func (r *Redis) MGet(keys ...string) ([][]byte, error) {
 	return rp.BytesArrayValue()
 }
 
+// Atomically transfer a key from a source Redis instance to a destination Redis instance.
+// On success the key is deleted from the original instance and is guaranteed to exist in the target instance.
+//
+// The command is atomic and blocks the two instances for the time required to transfer the key,
+// at any given time the key will appear to exist in a given instance or in the other instance, unless a timeout error occurs.
+//
+// The timeout specifies the maximum idle time in any moment of the communication with the destination instance in milliseconds.
+//
+// COPY -- Do not remove the key from the local instance.
+// REPLACE -- Replace existing key on the remote instance.
+//
+// Status code reply: The command returns OK on success.
+// MIGRATE host port key destination-db timeout [COPY] [REPLACE]
+//
+// func (r *Redis) Migrate(host, port, key string, db, timeout int, cp, replace bool) error {
+// 	args := packArgs("MIGRATE", host, port, key, db, timeout)
+// 	if cp {
+// 		args = append(args, "COPY")
+// 	}
+// 	if replace {
+// 		args = append(args, "REPLACE")
+// 	}
+// 	rp, err := r.SendCommand(args...)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return rp.OKValue()
+// }
+
 // Move key from the currently selected database (see SELECT) to the specified destination database.
 // When key already exists in the destination database,
 // or it does not exist in the source database, it does nothing.
