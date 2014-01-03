@@ -884,12 +884,12 @@ func (r *Redis) GetRange(key string, start, end int) (string, error) {
 
 // Atomically sets key to value and returns the old value stored at key.
 // Returns an error when key exists but does not hold a string value.
-func (r *Redis) GetSet(key, value string) (string, error) {
+func (r *Redis) GetSet(key, value string) ([]byte, error) {
 	rp, err := r.SendCommand("GETSET", key, value)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return rp.StringValue()
+	return rp.BytesValue()
 }
 
 // Removes the specified fields from the hash stored at key.
