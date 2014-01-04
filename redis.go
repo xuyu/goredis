@@ -1393,12 +1393,9 @@ func (r *Redis) PubSub() (*PubSub, error) {
 	return newPubSub(r)
 }
 
+// QUIT
 // Ask the server to close the connection.
 // The connection is closed as soon as all pending replies have been written to the client.
-func (r *Redis) Quit() error {
-	_, err := r.SendCommand("QUIT")
-	return err
-}
 
 // Return a random key from the currently selected database.
 // Bulk reply: the random key, or nil when the database is empty.
