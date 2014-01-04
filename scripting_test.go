@@ -48,3 +48,45 @@ func TestEval(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestEvalSha(t *testing.T) {
+	r.ScriptFlush()
+	sha1, _ := r.ScriptLoad("return 10")
+	if rp, err := r.EvalSha(sha1, nil, nil); err != nil {
+		t.Error(err)
+	} else if rp.Type != IntegerReply {
+		t.Fail()
+	} else if rp.Integer != 10 {
+		t.Fail()
+	}
+}
+
+func TestScriptExists(t *testing.T) {
+	r.ScriptFlush()
+	sha1, _ := r.ScriptLoad("return 10")
+	if bs, err := r.ScriptExists(sha1, "sha1"); err != nil {
+		t.Error(err)
+	} else if len(bs) != 2 {
+		t.Fail()
+	} else if !bs[0] {
+		t.Fail()
+	} else if bs[1] {
+		t.Fail()
+	}
+}
+
+func TestScriptFlush(t *testing.T) {
+	sha1, _ := r.ScriptLoad("return 10")
+	r.ScriptFlush()
+	if bs, err := r.ScriptExists(sha1); err != nil {
+		t.Error(err)
+	} else if bs[0] {
+		t.Fail()
+	}
+}
+
+func TestScriptKill(t *testing.T) {
+	if err := r.ScriptKill(); err == nil {
+		t.Error(err)
+	}
+}
