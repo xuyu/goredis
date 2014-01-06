@@ -1580,6 +1580,18 @@ func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	return rp.ListValue()
 }
 
+// This command is equal to SDIFF, but instead of returning the resulting set, it is stored in destination.
+// If destination already exists, it is overwritten.
+// Integer reply: the number of elements in the resulting set.
+func (r *Redis) SDiffStore(destination string, keys ...string) (int64, error) {
+	args := packArgs("SDIFFSTORE", destination, keys)
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
+
 // Set key to hold the string value.
 // If key already holds a value, it is overwritten, regardless of its type.
 // Any previous time to live associated with the key is discarded on successful SET operation.
@@ -1760,12 +1772,12 @@ func (r *Redis) SRandMember(key string) ([]byte, error) {
 // If called with a negative count the behavior changes and the command is allowed to return the same element multiple times.
 // In this case the numer of returned elements is the absolute value of the specified count.
 // returns an array of elements, or an empty array when key does not exist.
-func (r *Redis) SRandMemberCount(key string, count int) ([][]byte, error) {
+func (r *Redis) SRandMemberCount(key string, count int) ([]string, error) {
 	rp, err := r.SendCommand("SRANDMEMBER", key, count)
 	if err != nil {
 		return nil, err
 	}
-	return rp.BytesArrayValue()
+	return rp.ListValue()
 }
 
 // Remove the specified members from the set stored at key.
