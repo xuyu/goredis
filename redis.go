@@ -1871,7 +1871,7 @@ func (r *Redis) Type(key string) (string, error) {
 // If the key exists but does not hold a sorted set, an error is returned.
 // Return value:
 // The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
-func (r *Redis) ZAdd(key string, pairs map[string]float32) (int64, error) {
+func (r *Redis) ZAdd(key string, pairs map[string]float64) (int64, error) {
 	args := packArgs("ZADD", key)
 	for member, score := range pairs {
 		args = append(args, score, member)
@@ -1910,7 +1910,7 @@ func (r *Redis) ZCount(key, min, max string) (int64, error) {
 // If key does not exist, a new sorted set with the specified member as its sole member is created.
 // An error is returned when key exists but does not hold a sorted set.
 // Bulk reply: the new score of member (a double precision floating point number), represented as string.
-func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, error) {
+func (r *Redis) ZIncrBy(key string, increment float64, member string) (float64, error) {
 	rp, err := r.SendCommand("ZINCRBY", key, increment, member)
 	if err != nil {
 		return 0.0, err
@@ -1919,11 +1919,11 @@ func (r *Redis) ZIncrBy(key string, increment float32, member string) (float32, 
 	if err != nil {
 		return 0.0, err
 	}
-	score, err := strconv.ParseFloat(s, 32)
+	score, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0.0, err
 	}
-	return float32(score), nil
+	return score, nil
 }
 
 /*
