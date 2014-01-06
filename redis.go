@@ -1871,8 +1871,11 @@ func (r *Redis) Type(key string) (string, error) {
 // If the key exists but does not hold a sorted set, an error is returned.
 // Return value:
 // The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
-func (r *Redis) ZAdd(key string, pairs map[float32]string) (int64, error) {
-	args := packArgs("ZADD", key, pairs)
+func (r *Redis) ZAdd(key string, pairs map[string]float32) (int64, error) {
+	args := packArgs("ZADD", key)
+	for member, score := range pairs {
+		args = append(args, score, member)
+	}
 	rp, err := r.SendCommand(args...)
 	if err != nil {
 		return 0, err
