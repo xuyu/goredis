@@ -1896,7 +1896,7 @@ func (r *Redis) ZCard(key string) (int64, error) {
 // Returns the number of elements in the sorted set at key with a score between min and max.
 // The min and max arguments have the same semantic as described for ZRANGEBYSCORE.
 // Integer reply: the number of elements in the specified score range.
-func (r *Redis) ZCount(key string, min, max float32) (int64, error) {
+func (r *Redis) ZCount(key, min, max string) (int64, error) {
 	rp, err := r.SendCommand("ZCOUNT", key, min, max)
 	if err != nil {
 		return 0, err
