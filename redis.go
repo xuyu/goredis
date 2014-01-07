@@ -2102,13 +2102,13 @@ func (r *Redis) Transaction() (*Transaction, error) {
 
 type Transaction struct {
 	redis *Redis
-	c     *Connection
+	conn  *Connection
 }
 
 func newTransaction(r *Redis, c *Connection) (*Transaction, error) {
 	t := &Transaction{
 		redis: r,
-		c:     c,
+		conn:  c,
 	}
 	err := t.multi()
 	if err != nil {
@@ -2118,44 +2118,53 @@ func newTransaction(r *Redis, c *Connection) (*Transaction, error) {
 	return t, nil
 }
 
+// Marks the start of a transaction block.
+// Subsequent commands will be queued for atomic execution using EXEC.
 func (t *Transaction) multi() error {
-	if err := t.c.SendCommand("MULTI"); err != nil {
+	if err := t.conn.SendCommand("MULTI"); err != nil {
 		return err
 	}
-	_, err := t.c.RecvReply()
+	_, err := t.conn.RecvReply()
 	return err
 }
 
+// Flushes all previously queued commands in a transaction and restores the connection state to normal.
+// If WATCH was used, DISCARD unwatches all keys.
 func (t *Transaction) Discard() error {
-	if err := t.c.SendCommand("DISCARD"); err != nil {
+	if err := t.conn.SendCommand("DISCARD"); err != nil {
 		return err
 	}
-	_, err := t.c.RecvReply()
+	_, err := t.conn.RecvReply()
 	return err
 }
 
+// Marks the given keys to be watched for conditional execution of a transaction.
 func (t *Transaction) Watch(keys ...string) error {
 	args := packArgs("WATCH", keys)
-	if err := t.c.SendCommand(args...); err != nil {
+	if err := t.conn.SendCommand(args...); err != nil {
 		return err
 	}
-	_, err := t.c.RecvReply()
+	_, err := t.conn.RecvReply()
 	return err
 }
 
+// Flushes all the previously watched keys for a transaction.
+// If you call EXEC or DISCARD, there's no need to manually call UNWATCH.
 func (t *Transaction) UnWatch() error {
-	if err := t.c.SendCommand("UNWATCH"); err != nil {
+	if err := t.conn.SendCommand("UNWATCH"); err != nil {
 		return err
 	}
-	_, err := t.c.RecvReply()
+	_, err := t.conn.RecvReply()
 	return err
 }
 
+// Executes all previously queued commands in a transaction and restores the connection state to normal.
+// When using WATCH, EXEC will execute commands only if the watched keys were not modified, allowing for a check-and-set mechanism.
 func (t *Transaction) Exec() ([]*Reply, error) {
-	if err := t.c.SendCommand("EXEC"); err != nil {
+	if err := t.conn.SendCommand("EXEC"); err != nil {
 		return nil, err
 	}
-	rp, err := t.c.RecvReply()
+	rp, err := t.conn.RecvReply()
 	if err != nil {
 		return nil, err
 	}
@@ -2163,15 +2172,15 @@ func (t *Transaction) Exec() ([]*Reply, error) {
 }
 
 func (t *Transaction) Close() {
-	t.redis.activeConnection(t.c)
+	t.redis.activeConnection(t.conn)
 }
 
 func (t *Transaction) Command(args ...interface{}) error {
 	args2 := packArgs(args...)
-	if err := t.c.SendCommand(args2...); err != nil {
+	if err := t.conn.SendCommand(args2...); err != nil {
 		return err
 	}
-	rp, err := t.c.RecvReply()
+	rp, err := t.conn.RecvReply()
 	if err != nil {
 		return err
 	}
