@@ -2112,7 +2112,7 @@ func newTransaction(r *Redis, c *Connection) (*Transaction, error) {
 	}
 	err := t.multi()
 	if err != nil {
-		r.activeConnection(c)
+		c.Conn.Close()
 		return nil, err
 	}
 	return t, nil

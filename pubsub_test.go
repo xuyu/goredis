@@ -112,12 +112,12 @@ func TestPUnSubscribe(t *testing.T) {
 			ch <- true
 		}
 	}()
-	sub.PSubscribe("channel.*")
+	sub.PSubscribe("news.*")
 	<-ch
 	if len(sub.Patterns) != 1 {
 		t.Fail()
 	}
-	if err := sub.PUnSubscribe("channel.*"); err != nil {
+	if err := sub.PUnSubscribe("news.*"); err != nil {
 		t.Error(err)
 	}
 	<-ch
