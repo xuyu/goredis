@@ -259,7 +259,21 @@ func packCommand(args ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	for _, arg := range args {
-		s := fmt.Sprint(arg)
+		var s string
+		switch v := arg.(type) {
+		case string:
+			s = v
+		case []byte:
+			s = string(v)
+		case int:
+			s = strconv.Itoa(v)
+		case int64:
+			s = strconv.FormatInt(v, 10)
+		case float64:
+			s = strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			s = fmt.Sprint(arg)
+		}
 		if _, err := fmt.Fprintf(buf, "$%d\r\n%s\r\n", len(s), s); err != nil {
 			return nil, err
 		}
