@@ -2185,10 +2185,13 @@ func (t *Transaction) Command(args ...interface{}) error {
 	return nil
 }
 
+// http://redis.io/topics/pubsub
 type PubSub struct {
 	redis *Redis
-	c     *Connection
-	msg   chan interface{}
+	conn  *Connection
+
+	Patterns map[string]bool
+	Channels map[string]bool
 }
 
 func newPubSub(r *Redis) (*PubSub, error) {
@@ -2197,50 +2200,71 @@ func newPubSub(r *Redis) (*PubSub, error) {
 		return nil, err
 	}
 	p := &PubSub{
-		redis: r,
-		c:     c,
-		msg:   make(chan interface{}),
+		redis:    r,
+		conn:     c,
+		Patterns: make(map[string]bool),
+		Channels: make(map[string]bool),
 	}
-	go p.waitMsg()
 	return p, nil
 }
 
-func (p *PubSub) waitMsg() {
-	for {
-		rp, err := p.c.RecvReply()
-		if err != nil {
-			p.msg <- err
-			break
-		}
-		p.msg <- rp
-	}
-}
-
 func (p *PubSub) Close() error {
-	close(p.msg)
-	return p.c.Conn.Close()
+	return p.conn.Conn.Close()
 }
 
-func (p *PubSub) Message() <-chan interface{} {
-	return p.msg
+// Format of pushed messages
+// A message is a Multi-bulk reply with three elements.
+// The first element is the kind of message:
+// subscribe: means that we successfully subscribed to the channel given as the second element in the reply.
+// 		The third argument represents the number of channels we are currently subscribed to.
+// unsubscribe: means that we successfully unsubscribed from the channel given as second element in the reply.
+//		The third argument represents the number of channels we are currently subscribed to.
+// 		When the last argument is zero, we are no longer subscribed to any channel,
+// 		and the client can issue any kind of Redis command as we are outside the Pub/Sub state.
+// message: it is a message received as result of a PUBLISH command issued by another client.
+//		The second element is the name of the originating channel, and the third argument is the actual message payload.
+func (p *PubSub) Recv() ([]string, error) {
+	rp, err := p.conn.RecvReply()
+	if err != nil {
+		return nil, err
+	}
+	list, err := rp.ListValue()
+	if err != nil {
+		return list, err
+	}
+	switch strings.ToLower(list[0]) {
+	case "psubscribe":
+		p.Patterns[list[1]] = true
+	case "subscribe":
+		p.Channels[list[1]] = true
+	case "punsubscribe":
+		delete(p.Patterns, list[1])
+	case "unsubscribe":
+		delete(p.Channels, list[1])
+	}
+	return list, err
 }
 
+// SUBSCRIBE channel [channel ...]
 func (p *PubSub) Subscribe(channels ...string) error {
 	args := packArgs("SUBSCRIBE", channels)
-	return p.c.SendCommand(args...)
+	return p.conn.SendCommand(args...)
 }
 
+// PSUBSCRIBE pattern [pattern ...]
 func (p *PubSub) PSubscribe(patterns ...string) error {
 	args := packArgs("PSUBSCRIBE", patterns)
-	return p.c.SendCommand(args...)
+	return p.conn.SendCommand(args...)
 }
 
+// UNSUBSCRIBE [channel [channel ...]]
 func (p *PubSub) UnSubscribe(channels ...string) error {
 	args := packArgs("UNSUBSCRIBE", channels)
-	return p.c.SendCommand(args...)
+	return p.conn.SendCommand(args...)
 }
 
+// PUNSUBSCRIBE [pattern [pattern ...]]
 func (p *PubSub) PUnSubscribe(patterns ...string) error {
 	args := packArgs("PUNSUBSCRIBE", patterns)
-	return p.c.SendCommand(args...)
+	return p.conn.SendCommand(args...)
 }
