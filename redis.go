@@ -2017,7 +2017,7 @@ func (r *Redis) ZRemRangeByRank(key string, start, stop int) (int64, error) {
 
 // Removes all elements in the sorted set stored at key with a score between min and max (inclusive).
 // Integer reply: the number of elements removed.
-func (r *Redis) ZRemRangeByScore(key string, min, max int) (int64, error) {
+func (r *Redis) ZRemRangeByScore(key, min, max string) (int64, error) {
 	rp, err := r.SendCommand("ZREMRANGEBYSCORE", key, min, max)
 	if err != nil {
 		return 0, err
