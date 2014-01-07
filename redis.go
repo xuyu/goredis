@@ -2228,21 +2228,67 @@ func (p *PubSub) Recv() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	list, err := rp.ListValue()
+	command, err := rp.Multi[0].StringValue()
 	if err != nil {
-		return list, err
+		return nil, err
 	}
-	switch strings.ToLower(list[0]) {
-	case "psubscribe":
-		p.Patterns[list[1]] = true
-	case "subscribe":
-		p.Channels[list[1]] = true
-	case "punsubscribe":
-		delete(p.Patterns, list[1])
-	case "unsubscribe":
-		delete(p.Channels, list[1])
+	switch strings.ToLower(command) {
+	case "psubscribe", "punsubscribe":
+		pattern, err := rp.Multi[1].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		if command == "psubscribe" {
+			p.Patterns[pattern] = true
+		} else {
+			delete(p.Patterns, pattern)
+		}
+		number, err := rp.Multi[2].IntegerValue()
+		if err != nil {
+			return nil, err
+		}
+		return []string{command, pattern, strconv.FormatInt(number, 10)}, nil
+	case "subscribe", "unsubscribe":
+		channel, err := rp.Multi[1].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		if command == "subscribe" {
+			p.Channels[channel] = true
+		} else {
+			delete(p.Channels, channel)
+		}
+		number, err := rp.Multi[2].IntegerValue()
+		if err != nil {
+			return nil, err
+		}
+		return []string{command, channel, strconv.FormatInt(number, 10)}, nil
+	case "pmessage":
+		pattern, err := rp.Multi[1].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		channel, err := rp.Multi[2].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		message, err := rp.Multi[3].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		return []string{command, pattern, channel, message}, nil
+	case "message":
+		channel, err := rp.Multi[1].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		message, err := rp.Multi[2].StringValue()
+		if err != nil {
+			return nil, err
+		}
+		return []string{command, channel, message}, nil
 	}
-	return list, err
+	return nil, errors.New("pubsub protocol error")
 }
 
 // SUBSCRIBE channel [channel ...]
