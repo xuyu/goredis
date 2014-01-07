@@ -2093,7 +2093,7 @@ ZSCAN key cursor [MATCH pattern] [COUNT count]
 // so everything you can do with a Redis transaction, you can also do with a script,
 // and usually the script will be both simpler and faster.
 func (r *Redis) Transaction() (*Transaction, error) {
-	c, err := r.getConnection()
+	c, err := r.openConnection()
 	if err != nil {
 		return nil, err
 	}
@@ -2171,8 +2171,8 @@ func (t *Transaction) Exec() ([]*Reply, error) {
 	return rp.MultiValue()
 }
 
-func (t *Transaction) Close() {
-	t.redis.activeConnection(t.conn)
+func (t *Transaction) Close() error {
+	return t.conn.Conn.Close()
 }
 
 func (t *Transaction) Command(args ...interface{}) error {
