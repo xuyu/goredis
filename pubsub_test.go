@@ -2,10 +2,11 @@ package goredis
 
 import (
 	"testing"
+	"time"
 )
 
 func TestPublish(t *testing.T) {
-	if _, err := r.Publish("key", "value"); err != nil {
+	if _, err := r.Publish("channel", "message"); err != nil {
 		t.Error(err)
 	}
 }
@@ -21,6 +22,7 @@ func TestSubscribe(t *testing.T) {
 		if err := sub.Subscribe("channel"); err != nil {
 			t.Error(err)
 			quit <- true
+			return
 		}
 		for {
 			list, err := sub.Recv()
@@ -34,10 +36,13 @@ func TestSubscribe(t *testing.T) {
 					t.Fail()
 				}
 				quit <- true
+				break
 			}
 		}
 	}()
+	time.Sleep(100 * time.Millisecond)
 	r.Publish("channel", "message")
+	time.Sleep(100 * time.Millisecond)
 	<-quit
 }
 
@@ -52,6 +57,7 @@ func TestPSubscribe(t *testing.T) {
 		if err := psub.PSubscribe("news.*"); err != nil {
 			t.Error(err)
 			quit <- true
+			return
 		}
 		for {
 			list, err := psub.Recv()
@@ -65,10 +71,13 @@ func TestPSubscribe(t *testing.T) {
 					t.Fail()
 				}
 				quit <- true
+				break
 			}
 		}
 	}()
+	time.Sleep(100 * time.Millisecond)
 	r.Publish("news.china", "message")
+	time.Sleep(100 * time.Millisecond)
 	<-quit
 }
 
@@ -85,7 +94,9 @@ func TestUnSubscribe(t *testing.T) {
 			ch <- true
 		}
 	}()
+	time.Sleep(100 * time.Millisecond)
 	sub.Subscribe("channel")
+	time.Sleep(100 * time.Millisecond)
 	<-ch
 	if len(sub.Channels) != 1 {
 		t.Fail()
@@ -93,6 +104,7 @@ func TestUnSubscribe(t *testing.T) {
 	if err := sub.UnSubscribe("channel"); err != nil {
 		t.Error(err)
 	}
+	time.Sleep(100 * time.Millisecond)
 	<-ch
 	if len(sub.Channels) != 0 {
 		t.Fail()
@@ -112,7 +124,9 @@ func TestPUnSubscribe(t *testing.T) {
 			ch <- true
 		}
 	}()
+	time.Sleep(100 * time.Millisecond)
 	sub.PSubscribe("news.*")
+	time.Sleep(100 * time.Millisecond)
 	<-ch
 	if len(sub.Patterns) != 1 {
 		t.Fail()
@@ -120,6 +134,7 @@ func TestPUnSubscribe(t *testing.T) {
 	if err := sub.PUnSubscribe("news.*"); err != nil {
 		t.Error(err)
 	}
+	time.Sleep(100 * time.Millisecond)
 	<-ch
 	if len(sub.Patterns) != 0 {
 		t.Fail()
