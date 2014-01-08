@@ -3,13 +3,9 @@ goredis
 
 redis client in golang
 
+[Go or Golang](http://golang.org) is an open source programming language that makes it easy to build simple, reliable, and efficient software.
 
-[Go or Golang](http://golang.org) is an open source programming language that makes
- it easy to build simple, reliable, and efficient software.
-
-
-[Redis](http://redis.io) is an open source, BSD licensed, advanced key-value store.
- It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+[Redis](http://redis.io) is an open source, BSD licensed, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
 
 
 Features
@@ -26,7 +22,7 @@ Features
 Document
 --------
 
-- [Redis Command](http://redis.io/commands)
+- [Redis Commands](http://redis.io/commands)
 - [Redis Protocol](http://redis.io/topics/protocol)
 
 - [GoDoc](http://godoc.org/github.com/xuyu/goredis)
