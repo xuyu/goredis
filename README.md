@@ -11,6 +11,7 @@ Features
 --------
 
 * Python Redis Client Like API
+* Support Pipeling
 * Support Transaction
 * Support Publish Subscribe
 * Support Lua Eval
