@@ -2092,40 +2092,29 @@ ZSCAN key cursor [MATCH pattern] [COUNT count]
 // A Redis script is transactional by definition,
 // so everything you can do with a Redis transaction, you can also do with a script,
 // and usually the script will be both simpler and faster.
-func (r *Redis) Transaction() (*Transaction, error) {
-	c, err := r.openConnection()
-	if err != nil {
-		return nil, err
-	}
-	return newTransaction(r, c)
-}
-
 type Transaction struct {
 	redis *Redis
 	conn  *Connection
 }
 
-func newTransaction(r *Redis, c *Connection) (*Transaction, error) {
-	t := &Transaction{
-		redis: r,
-		conn:  c,
-	}
-	err := t.multi()
+func (r *Redis) Transaction() (*Transaction, error) {
+	c, err := r.getConnection()
 	if err != nil {
-		c.Conn.Close()
 		return nil, err
 	}
-	return t, nil
+	if err := c.SendCommand("MULTI"); err != nil {
+		r.activeConnection(c)
+		return nil, err
+	}
+	if _, err := c.RecvReply(); err != nil {
+		r.activeConnection(c)
+		return nil, err
+	}
+	return &Transaction{r, c}, nil
 }
 
-// Marks the start of a transaction block.
-// Subsequent commands will be queued for atomic execution using EXEC.
-func (t *Transaction) multi() error {
-	if err := t.conn.SendCommand("MULTI"); err != nil {
-		return err
-	}
-	_, err := t.conn.RecvReply()
-	return err
+func (t *Transaction) Close() {
+	t.redis.activeConnection(t.conn)
 }
 
 // Flushes all previously queued commands in a transaction and restores the connection state to normal.
@@ -2169,10 +2158,6 @@ func (t *Transaction) Exec() ([]*Reply, error) {
 		return nil, err
 	}
 	return rp.MultiValue()
-}
-
-func (t *Transaction) Close() error {
-	return t.conn.Conn.Close()
 }
 
 func (t *Transaction) Command(args ...interface{}) error {
