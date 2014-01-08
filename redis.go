@@ -2322,10 +2322,9 @@ func (r *Redis) Pipelining() (*Pipelined, error) {
 	return &Pipelined{r, c, 0}, nil
 }
 
-func (p *Pipelined) Close() error {
-	defer p.redis.activeConnection(p.conn)
+func (p *Pipelined) Close() {
+	p.redis.activeConnection(p.conn)
 	p.times = 0
-	return p.conn.Conn.Close()
 }
 
 func (p *Pipelined) Command(args ...interface{}) error {
