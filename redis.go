@@ -1403,10 +1403,6 @@ func (r *Redis) Publish(channel, message string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-func (r *Redis) PubSub() (*PubSub, error) {
-	return newPubSub(r)
-}
-
 // QUIT
 // Ask the server to close the connection.
 // The connection is closed as soon as all pending replies have been written to the client.
@@ -2188,18 +2184,17 @@ type PubSub struct {
 	Channels map[string]bool
 }
 
-func newPubSub(r *Redis) (*PubSub, error) {
+func (r *Redis) PubSub() (*PubSub, error) {
 	c, err := r.openConnection()
 	if err != nil {
 		return nil, err
 	}
-	p := &PubSub{
+	return &PubSub{
 		redis:    r,
 		conn:     c,
 		Patterns: make(map[string]bool),
 		Channels: make(map[string]bool),
-	}
-	return p, nil
+	}, nil
 }
 
 func (p *PubSub) Close() error {
@@ -2217,7 +2212,7 @@ func (p *PubSub) Close() error {
 // 		and the client can issue any kind of Redis command as we are outside the Pub/Sub state.
 // message: it is a message received as result of a PUBLISH command issued by another client.
 //		The second element is the name of the originating channel, and the third argument is the actual message payload.
-func (p *PubSub) Recv() ([]string, error) {
+func (p *PubSub) Receive() ([]string, error) {
 	rp, err := p.conn.RecvReply()
 	if err != nil {
 		return nil, err

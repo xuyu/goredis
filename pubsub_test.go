@@ -25,7 +25,7 @@ func TestSubscribe(t *testing.T) {
 			return
 		}
 		for {
-			list, err := sub.Recv()
+			list, err := sub.Receive()
 			if err != nil {
 				t.Error(err)
 				quit <- true
@@ -60,7 +60,7 @@ func TestPSubscribe(t *testing.T) {
 			return
 		}
 		for {
-			list, err := psub.Recv()
+			list, err := psub.Receive()
 			if err != nil {
 				t.Error(err)
 				quit <- true
@@ -90,7 +90,9 @@ func TestUnSubscribe(t *testing.T) {
 	defer sub.Close()
 	go func() {
 		for {
-			sub.Recv()
+			if _, err := sub.Receive(); err != nil {
+				t.Error(err)
+			}
 			ch <- true
 		}
 	}()
@@ -106,6 +108,7 @@ func TestUnSubscribe(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	<-ch
+	time.Sleep(100 * time.Millisecond)
 	if len(sub.Channels) != 0 {
 		t.Fail()
 	}
@@ -120,7 +123,9 @@ func TestPUnSubscribe(t *testing.T) {
 	defer sub.Close()
 	go func() {
 		for {
-			sub.Recv()
+			if _, err := sub.Receive(); err != nil {
+				t.Error(err)
+			}
 			ch <- true
 		}
 	}()
@@ -136,6 +141,7 @@ func TestPUnSubscribe(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	<-ch
+	time.Sleep(100 * time.Millisecond)
 	if len(sub.Patterns) != 0 {
 		t.Fail()
 	}
