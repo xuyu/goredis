@@ -216,3 +216,18 @@ func TestZScore(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestZScan(t *testing.T) {
+	r.Del("key")
+	pairs := map[string]float64{
+		"one":   1.0,
+		"two":   2.0,
+		"three": 3.0,
+	}
+	r.ZAdd("key", pairs)
+	if _, list, err := r.ZScan(0, "", 0); err != nil {
+		t.Error(err)
+	} else if len(list) == 0 {
+		t.Fail()
+	}
+}

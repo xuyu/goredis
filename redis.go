@@ -269,8 +269,10 @@ func packCommand(args ...interface{}) ([]byte, error) {
 			s = strconv.Itoa(v)
 		case int64:
 			s = strconv.FormatInt(v, 10)
+		case uint64:
+			s = strconv.FormatUint(v, 10)
 		case float64:
-			s = strconv.FormatFloat(v, 'f', -1, 64)
+			s = strconv.FormatFloat(v, 'g', -1, 64)
 		default:
 			s = fmt.Sprint(arg)
 		}
@@ -2076,12 +2078,111 @@ func (r *Redis) ZScore(key, member string) ([]byte, error) {
 ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 */
 
-/*
-SCAN cursor [MATCH pattern] [COUNT count]
-SSCAN key cursor [MATCH pattern] [COUNT count]
-SCAN key cursor [MATCH pattern] [COUNT count]
-ZSCAN key cursor [MATCH pattern] [COUNT count]
-*/
+// SCAN cursor [MATCH pattern] [COUNT count]
+func (r *Redis) Scan(cursor uint64, pattern string, count int) (uint64, []string, error) {
+	args := packArgs("SCAN", cursor)
+	if pattern != "" {
+		args = append(args, "MATCH", pattern)
+	}
+	if count > 0 {
+		args = append(args, "COUNT", count)
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	if rp.Type == ErrorReply {
+		return 0, nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return 0, nil, errors.New("scan protocol error")
+	}
+	first, err := rp.Multi[0].StringValue()
+	if err != nil {
+		return 0, nil, err
+	}
+	next, err := strconv.ParseUint(first, 10, 64)
+	if err != nil {
+		return 0, nil, err
+	}
+	list, err := rp.Multi[1].ListValue()
+	return next, list, err
+}
+
+// SSCAN key cursor [MATCH pattern] [COUNT count]
+func (r *Redis) SScan(cursor uint64, pattern string, count int) (uint64, []string, error) {
+	args := packArgs("SCAN", cursor)
+	if pattern != "" {
+		args = append(args, "MATCH", pattern)
+	}
+	if count > 0 {
+		args = append(args, "COUNT", count)
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	first, err := rp.Multi[0].StringValue()
+	if err != nil {
+		return 0, nil, err
+	}
+	next, err := strconv.ParseUint(first, 10, 64)
+	if err != nil {
+		return 0, nil, err
+	}
+	list, err := rp.Multi[1].ListValue()
+	return next, list, err
+}
+
+// HSCAN key cursor [MATCH pattern] [COUNT count]
+func (r *Redis) HScan(cursor uint64, pattern string, count int) (uint64, map[string]string, error) {
+	args := packArgs("SCAN", cursor)
+	if pattern != "" {
+		args = append(args, "MATCH", pattern)
+	}
+	if count > 0 {
+		args = append(args, "COUNT", count)
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	first, err := rp.Multi[0].StringValue()
+	if err != nil {
+		return 0, nil, err
+	}
+	next, err := strconv.ParseUint(first, 10, 64)
+	if err != nil {
+		return 0, nil, err
+	}
+	hash, err := rp.Multi[1].HashValue()
+	return next, hash, err
+}
+
+// ZSCAN key cursor [MATCH pattern] [COUNT count]
+func (r *Redis) ZScan(cursor uint64, pattern string, count int) (uint64, []string, error) {
+	args := packArgs("SCAN", cursor)
+	if pattern != "" {
+		args = append(args, "MATCH", pattern)
+	}
+	if count > 0 {
+		args = append(args, "COUNT", count)
+	}
+	rp, err := r.SendCommand(args...)
+	if err != nil {
+		return 0, nil, err
+	}
+	first, err := rp.Multi[0].StringValue()
+	if err != nil {
+		return 0, nil, err
+	}
+	next, err := strconv.ParseUint(first, 10, 64)
+	if err != nil {
+		return 0, nil, err
+	}
+	list, err := rp.Multi[1].ListValue()
+	return next, list, err
+}
 
 // Document: http://redis.io/topics/transactions
 // MULTI, EXEC, DISCARD and WATCH are the foundation of transactions in Redis.

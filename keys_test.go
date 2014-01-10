@@ -211,3 +211,15 @@ func TestType(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestScan(t *testing.T) {
+	r.FlushDB()
+	cursor, list, err := r.Scan(0, "", 0)
+	if err != nil {
+		t.Error(err)
+	} else if len(list) != 0 {
+		t.Fail()
+	} else if cursor != 0 {
+		t.Fail()
+	}
+}
