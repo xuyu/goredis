@@ -157,7 +157,7 @@ func TestHVals(t *testing.T) {
 func TestHScan(t *testing.T) {
 	r.Del("key")
 	r.HSet("key", "field", "value")
-	if _, hash, err := r.HScan(0, "", 0); err != nil {
+	if _, hash, err := r.HScan("key", 0, "", 0); err != nil {
 		t.Error(err)
 	} else if len(hash) == 0 {
 		t.Fail()

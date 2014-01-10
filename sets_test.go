@@ -181,7 +181,7 @@ func TestSUnionStore(t *testing.T) {
 func TestSScan(t *testing.T) {
 	r.Del("key")
 	r.SAdd("key", "one", "two", "three")
-	if _, list, err := r.SScan(0, "", 0); err != nil {
+	if _, list, err := r.SScan("key", 0, "", 0); err != nil {
 		t.Error(err)
 	} else if len(list) == 0 {
 		t.Fail()

@@ -1662,8 +1662,8 @@ func (r *Redis) Scan(cursor uint64, pattern string, count int) (uint64, []string
 }
 
 // SSCAN key cursor [MATCH pattern] [COUNT count]
-func (r *Redis) SScan(cursor uint64, pattern string, count int) (uint64, []string, error) {
-	args := packArgs("SCAN", cursor)
+func (r *Redis) SScan(key string, cursor uint64, pattern string, count int) (uint64, []string, error) {
+	args := packArgs("SSCAN", key, cursor)
 	if pattern != "" {
 		args = append(args, "MATCH", pattern)
 	}
@@ -1687,8 +1687,8 @@ func (r *Redis) SScan(cursor uint64, pattern string, count int) (uint64, []strin
 }
 
 // HSCAN key cursor [MATCH pattern] [COUNT count]
-func (r *Redis) HScan(cursor uint64, pattern string, count int) (uint64, map[string]string, error) {
-	args := packArgs("SCAN", cursor)
+func (r *Redis) HScan(key string, cursor uint64, pattern string, count int) (uint64, map[string]string, error) {
+	args := packArgs("HSCAN", key, cursor)
 	if pattern != "" {
 		args = append(args, "MATCH", pattern)
 	}
@@ -1712,8 +1712,8 @@ func (r *Redis) HScan(cursor uint64, pattern string, count int) (uint64, map[str
 }
 
 // ZSCAN key cursor [MATCH pattern] [COUNT count]
-func (r *Redis) ZScan(cursor uint64, pattern string, count int) (uint64, []string, error) {
-	args := packArgs("SCAN", cursor)
+func (r *Redis) ZScan(key string, cursor uint64, pattern string, count int) (uint64, []string, error) {
+	args := packArgs("ZSCAN", key, cursor)
 	if pattern != "" {
 		args = append(args, "MATCH", pattern)
 	}

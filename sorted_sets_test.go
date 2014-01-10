@@ -225,7 +225,7 @@ func TestZScan(t *testing.T) {
 		"three": 3.0,
 	}
 	r.ZAdd("key", pairs)
-	if _, list, err := r.ZScan(0, "", 0); err != nil {
+	if _, list, err := r.ZScan("key", 0, "", 0); err != nil {
 		t.Error(err)
 	} else if len(list) == 0 {
 		t.Fail()
