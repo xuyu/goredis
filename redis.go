@@ -292,10 +292,15 @@ func (r *Redis) DBSize() (int64, error) {
 	return rp.IntegerValue()
 }
 
-/*
-DEBUG OBJECT key
-DEBUG OBJECT is a debugging command that should not be used by clients.
-*/
+// DEBUG OBJECT key
+// DEBUG OBJECT is a debugging command that should not be used by clients.
+func (r *Redis) DebugObject(key string) (string, error) {
+	rp, err := r.ExecuteCommand("DEBUG", "OBJECT", key)
+	if err != nil {
+		return "", err
+	}
+	return rp.StatusValue()
+}
 
 /*
 DEBUG SEGFAULT
@@ -349,6 +354,7 @@ func (r *Redis) Dump(key string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
+// Returns message.
 func (r *Redis) Echo(message string) (string, error) {
 	rp, err := r.ExecuteCommand("ECHO", message)
 	if err != nil {
@@ -357,16 +363,24 @@ func (r *Redis) Echo(message string) (string, error) {
 	return rp.StringValue()
 }
 
+// The first argument of EVAL is a Lua 5.1 script.
+// The script does not need to define a Lua function (and should not).
+// It is just a Lua program that will run in the context of the Redis server.
+// The second argument of EVAL is the number of arguments that follows the script (starting from the third argument) that represent Redis key names.
+// This arguments can be accessed by Lua using the KEYS global variable in the form of a one-based array (so KEYS[1], KEYS[2], ...).
 func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
 	cmds := packArgs("EVAL", script, len(keys), keys, args)
 	return r.ExecuteCommand(cmds...)
 }
 
+// Evaluates a script cached on the server side by its SHA1 digest.
+// Scripts are cached on the server side using the SCRIPT LOAD command.
 func (r *Redis) EvalSha(sha1 string, keys []string, args []string) (*Reply, error) {
 	cmds := packArgs("EVALSHA", sha1, len(keys), keys, args)
 	return r.ExecuteCommand(cmds...)
 }
 
+// Returns if key exists.
 func (r *Redis) Exists(key string) (bool, error) {
 	rp, err := r.ExecuteCommand("EXISTS", key)
 	if err != nil {
@@ -886,12 +900,14 @@ func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
 	return rp.BoolValue()
 }
 
-/*
-The OBJECT command allows to inspect the internals of Redis Objects associated with keys.
-It is useful for debugging or to understand if your keys are using the specially encoded data types to save space.
-Your application may also use the information reported by the OBJECT command to implement application level key eviction policies
-when using Redis as a Cache.
-*/
+// The OBJECT command allows to inspect the internals of Redis Objects associated with keys.
+// It is useful for debugging or to understand if your keys are using the specially encoded data types to save space.
+// Your application may also use the information reported by the OBJECT command to implement application level key eviction policies
+// when using Redis as a Cache.
+func (r *Redis) Object(subcommand string, arguments ...string) (*Reply, error) {
+	args := packArgs("OBJECT", subcommand, arguments)
+	return r.ExecuteCommand(args...)
+}
 
 // Remove the existing timeout on key,
 // turning the key from volatile (a key with an expire set) to persistent
@@ -1307,10 +1323,6 @@ func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	}
 	return rp.BoolValue()
 }
-
-/*
-SORT key [BY pattern] [LIMIT offset count] [GET pattern [GET pattern ...]] [ASC|DESC] [ALPHA] [STORE destination]
-*/
 
 // Removes and returns a random element from the set value stored at key.
 // Bulk reply: the removed element, or nil when key does not exist.
