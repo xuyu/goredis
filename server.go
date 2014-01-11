@@ -326,10 +326,6 @@ func (r *Redis) SlowLogReset() error {
 	return rp.OKValue()
 }
 
-/*
-SYNC Internal command used for replication
-*/
-
 // A multi bulk reply containing two elements:
 // unix time in seconds.
 // microseconds.
