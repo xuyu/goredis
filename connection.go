@@ -55,7 +55,7 @@ func (c *Connection) RecvReply() (*Reply, error) {
 		if err != nil {
 			return nil, err
 		}
-		bulk, err := c.readBulk(size)
+		bulk, err := c.ReadBulk(size)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +85,7 @@ func (c *Connection) RecvReply() (*Reply, error) {
 	return nil, errors.New("redis protocol error")
 }
 
-func (c *Connection) readBulk(size int) ([]byte, error) {
+func (c *Connection) ReadBulk(size int) ([]byte, error) {
 	// If the requested value does not exist the bulk reply will use the special value -1 as data length
 	if size < 0 {
 		return nil, nil
