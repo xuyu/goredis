@@ -262,10 +262,69 @@ func (r *Redis) SlaveOf(host, port string) error {
 	return rp.OKValue()
 }
 
-/*
-SLOWLOG subcommand [argument]
-This command is used in order to read and reset the Redis slow queries log.
-*/
+// SLOWLOG subcommand [argument]
+// This command is used in order to read and reset the Redis slow queries log.
+type SlowLog struct {
+	ID           int64
+	Timestamp    int64
+	Microseconds int64
+	Command      []string
+}
+
+func (r *Redis) SlowLogGet(n int) ([]*SlowLog, error) {
+	rp, err := r.ExecuteCommand("SLOWLOG", "GET", n)
+	if err != nil {
+		return nil, err
+	}
+	if rp.Type == ErrorReply {
+		return nil, errors.New(rp.Error)
+	}
+	if rp.Type != MultiReply {
+		return nil, errors.New("slowlog get protocol error")
+	}
+	var slow []*SlowLog
+	for _, subrp := range rp.Multi {
+		if subrp.Multi == nil || len(subrp.Multi) != 4 {
+			return nil, errors.New("slowlog get protocol error")
+		}
+		id, err := subrp.Multi[0].IntegerValue()
+		if err != nil {
+			return nil, err
+		}
+		timestamp, err := subrp.Multi[1].IntegerValue()
+		if err != nil {
+			return nil, err
+		}
+		microseconds, err := subrp.Multi[2].IntegerValue()
+		if err != nil {
+			return nil, err
+		}
+		command, err := subrp.Multi[3].ListValue()
+		if err != nil {
+			return nil, err
+		}
+		slow = append(slow, &SlowLog{id, timestamp, microseconds, command})
+	}
+	return slow, nil
+}
+
+// Obtaining the current length of the slow log
+func (r *Redis) SlowLogLen() (int64, error) {
+	rp, err := r.ExecuteCommand("SLOWLOG", "LEN")
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
+
+// Resetting the slow log. Once deleted the information is lost forever.
+func (r *Redis) SlowLogReset() error {
+	rp, err := r.ExecuteCommand("SLOWLOG", "RESET")
+	if err != nil {
+		return err
+	}
+	return rp.OKValue()
+}
 
 /*
 SYNC Internal command used for replication
