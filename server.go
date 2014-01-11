@@ -135,12 +135,6 @@ func (r *Redis) DebugObject(key string) (string, error) {
 	return rp.StatusValue()
 }
 
-/*
-DEBUG SEGFAULT
-DEBUG SEGFAULT performs an invalid memory access that crashes Redis.
-It is used to simulate bugs during the development.
-*/
-
 // Delete all the keys of all the existing databases,
 // not just the currently selected one.
 // This command never fails.
