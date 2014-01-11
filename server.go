@@ -174,10 +174,41 @@ func (r *Redis) LastSave() (int64, error) {
 	return rp.IntegerValue()
 }
 
-/*
-MONITOR
-MONITOR is a debugging command that streams back every command processed by the Redis server.
-*/
+// MONITOR is a debugging command that streams back every command processed by the Redis server.
+type MonitorCommand struct {
+	redis *Redis
+	conn  *Connection
+}
+
+func (r *Redis) Monitor() (*MonitorCommand, error) {
+	c, err := r.openConnection()
+	if err != nil {
+		return nil, err
+	}
+	if err := c.SendCommand("MONITOR"); err != nil {
+		return nil, err
+	}
+	rp, err := c.RecvReply()
+	if err != nil {
+		return nil, err
+	}
+	if err := rp.OKValue(); err != nil {
+		return nil, err
+	}
+	return &MonitorCommand{r, c}, nil
+}
+
+func (m *MonitorCommand) Receive() (string, error) {
+	rp, err := m.conn.RecvReply()
+	if err != nil {
+		return "", err
+	}
+	return rp.StatusValue()
+}
+
+func (m *MonitorCommand) Close() error {
+	return m.conn.SendCommand("QUIT")
+}
 
 // The SAVE commands performs a synchronous save of the dataset producing a point in time snapshot of all the data inside the Redis instance,
 // in the form of an RDB file.
