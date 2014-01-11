@@ -24,3 +24,23 @@ func TestPing(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestQuit(t *testing.T) {
+	client, err := DialTimeout(network, address, db, password, timeout, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Quit(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSelect(t *testing.T) {
+	client, err := DialTimeout(network, address, db, password, timeout, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Select(db + 1); err != nil {
+		t.Error(err)
+	}
+}

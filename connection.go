@@ -123,9 +123,43 @@ func (r *Redis) Ping() error {
 	return err
 }
 
-// QUIT
-// Ask the server to close the connection.
-// The connection is closed as soon as all pending replies have been written to the client.
+// Ask the server to close the all connections.
+// The connections is closed as soon as all pending replies have been written to the client.
+func (r *Redis) Quit() error {
+	for i := 0; i < r.size; i++ {
+		c := <-r.pool
+		if c != nil {
+			if err := c.SendCommand("QUIT"); err != nil {
+				return err
+			}
+			rp, err := c.RecvReply()
+			if err != nil {
+				return err
+			}
+			if err := rp.OKValue(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
-// SELECT index
-// Change the selected database for the current connection.
+// Change the selected database for the all connections.
+func (r *Redis) Select(index int) error {
+	for i := 0; i < r.size; i++ {
+		c := <-r.pool
+		if c != nil {
+			if err := c.SendCommand("SELECT", index); err != nil {
+				return err
+			}
+			rp, err := c.RecvReply()
+			if err != nil {
+				return err
+			}
+			if err := rp.OKValue(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
