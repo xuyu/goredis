@@ -96,3 +96,36 @@ func (c *Connection) readBulk(size int) ([]byte, error) {
 	}
 	return buf[:size], nil
 }
+
+// If password matches the password in the configuration file,
+// the server replies with the OK status code and starts accepting commands.
+// Otherwise, an error is returned and the clients needs to try a new password.
+func (r *Redis) Auth(password string) error {
+	rp, err := r.ExecuteCommand("AUTH", password)
+	if err != nil {
+		return err
+	}
+	return rp.OKValue()
+}
+
+// Returns message.
+func (r *Redis) Echo(message string) (string, error) {
+	rp, err := r.ExecuteCommand("ECHO", message)
+	if err != nil {
+		return "", err
+	}
+	return rp.StringValue()
+}
+
+// Returns PONG. This command is often used to test if a connection is still alive, or to measure latency.
+func (r *Redis) Ping() error {
+	_, err := r.ExecuteCommand("PING")
+	return err
+}
+
+// QUIT
+// Ask the server to close the connection.
+// The connection is closed as soon as all pending replies have been written to the client.
+
+// SELECT index
+// Change the selected database for the current connection.

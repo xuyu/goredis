@@ -6,6 +6,16 @@ import (
 	"strings"
 )
 
+// Posts a message to the given channel.
+// Integer reply: the number of clients that received the message.
+func (r *Redis) Publish(channel, message string) (int64, error) {
+	rp, err := r.ExecuteCommand("PUBLISH", channel, message)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
+
 // http://redis.io/topics/pubsub
 type PubSub struct {
 	redis *Redis
