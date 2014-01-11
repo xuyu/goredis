@@ -22,8 +22,10 @@ func (r *Redis) BitCount(key string, start, end int) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Perform a bitwise operation between multiple keys (containing string values) and store the result in the destination key.
-// The BITOP command supports four bitwise operations: AND, OR, XOR and NOT, thus the valid forms to call the command are:
+// Perform a bitwise operation between multiple keys (containing string values)
+// and store the result in the destination key.
+// The BITOP command supports four bitwise operations:
+// AND, OR, XOR and NOT, thus the valid forms to call the command are:
 // BITOP AND destkey srckey1 srckey2 srckey3 ... srckeyN
 // BITOP OR destkey srckey1 srckey2 srckey3 ... srckeyN
 // BITOP XOR destkey srckey1 srckey2 srckey3 ... srckeyN
@@ -184,7 +186,8 @@ func (r *Redis) MSetnx(pairs map[string]string) (bool, error) {
 	return rp.BoolValue()
 }
 
-// PSETEX works exactly like SETEX with the sole difference that the expire time is specified in milliseconds instead of seconds.
+// PSETEX works exactly like SETEX with the sole difference that
+// the expire time is specified in milliseconds instead of seconds.
 func (r *Redis) PSetex(key string, milliseconds int, value string) error {
 	_, err := r.ExecuteCommand("PSETEX", key, milliseconds, value)
 	return err

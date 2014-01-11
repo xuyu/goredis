@@ -65,7 +65,8 @@ func (t *Transaction) UnWatch() error {
 }
 
 // Executes all previously queued commands in a transaction and restores the connection state to normal.
-// When using WATCH, EXEC will execute commands only if the watched keys were not modified, allowing for a check-and-set mechanism.
+// When using WATCH, EXEC will execute commands only if the watched keys were not modified,
+// allowing for a check-and-set mechanism.
 func (t *Transaction) Exec() ([]*Reply, error) {
 	if err := t.conn.SendCommand("EXEC"); err != nil {
 		return nil, err

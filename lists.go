@@ -38,7 +38,8 @@ func (r *Redis) BRPop(keys []string, timeout int) ([]string, error) {
 // BRPOPLPUSH is the blocking variant of RPOPLPUSH.
 // When source contains elements,
 // this command behaves exactly like RPOPLPUSH.
-// When source is empty, Redis will block the connection until another client pushes to it or until timeout is reached.
+// When source is empty, Redis will block the connection until
+// another client pushes to it or until timeout is reached.
 // A timeout of zero can be used to block indefinitely.
 // Bulk reply: the element being popped from source and pushed to destination.
 // If timeout is reached, a Null multi-bulk reply is returned.
@@ -171,7 +172,8 @@ func (r *Redis) LSet(key string, index int, value string) error {
 }
 
 // Trim an existing list so that it will contain only the specified range of elements specified.
-// Both start and stop are zero-based indexes, where 0 is the first element of the list (the head), 1 the next element and so on.
+// Both start and stop are zero-based indexes, where 0 is the first element of the list (the head),
+// 1 the next element and so on.
 func (r *Redis) LTrim(key string, start, stop int) error {
 	rp, err := r.ExecuteCommand("LTRIM", key, start, stop)
 	if err != nil {

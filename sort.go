@@ -19,11 +19,15 @@ func (r *Redis) Sort(key string) *SortCommand {
 	return &SortCommand{redis: r, key: key}
 }
 
+// The BY option can also take a non-existent key, which causes SORT to skip the sorting operation.
 func (s *SortCommand) By(pattern string) *SortCommand {
 	s.by = pattern
 	return s
 }
 
+// This modifier takes the offset argument,
+// specifying the number of elements to skip and the count argument,
+// specifying the number of elements to return from starting at offset.
 func (s *SortCommand) Limit(offset, count int) *SortCommand {
 	s.limit = true
 	s.offset = offset

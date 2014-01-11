@@ -72,9 +72,11 @@ func (r *Redis) Keys(pattern string) ([]string, error) {
 // On success the key is deleted from the original instance and is guaranteed to exist in the target instance.
 //
 // The command is atomic and blocks the two instances for the time required to transfer the key,
-// at any given time the key will appear to exist in a given instance or in the other instance, unless a timeout error occurs.
+// at any given time the key will appear to exist in a given instance or in the other instance,
+// unless a timeout error occurs.
 //
-// The timeout specifies the maximum idle time in any moment of the communication with the destination instance in milliseconds.
+// The timeout specifies the maximum idle time in any moment of the communication
+// with the destination instance in milliseconds.
 //
 // COPY -- Do not remove the key from the local instance.
 // REPLACE -- Replace existing key on the remote instance.
@@ -110,7 +112,8 @@ func (r *Redis) Move(key string, db int) (bool, error) {
 
 // The OBJECT command allows to inspect the internals of Redis Objects associated with keys.
 // It is useful for debugging or to understand if your keys are using the specially encoded data types to save space.
-// Your application may also use the information reported by the OBJECT command to implement application level key eviction policies
+// Your application may also use the information reported by the OBJECT command
+// to implement application level key eviction policies
 // when using Redis as a Cache.
 func (r *Redis) Object(subcommand string, arguments ...string) (*Reply, error) {
 	args := packArgs("OBJECT", subcommand, arguments)
@@ -130,7 +133,8 @@ func (r *Redis) Persist(key string) (bool, error) {
 	return rp.BoolValue()
 }
 
-// This command works exactly like EXPIRE but the time to live of the key is specified in milliseconds instead of seconds.
+// This command works exactly like EXPIRE
+// but the time to live of the key is specified in milliseconds instead of seconds.
 func (r *Redis) PExpire(key string, milliseconds int) (bool, error) {
 	rp, err := r.ExecuteCommand("PEXPIRE", key, milliseconds)
 	if err != nil {
@@ -150,7 +154,8 @@ func (r *Redis) PExpireAt(key string, timestamp int64) (bool, error) {
 }
 
 // Like TTL this command returns the remaining time to live of a key that has an expire set,
-// with the sole difference that TTL returns the amount of remaining time in seconds while PTTL returns it in milliseconds.
+// with the sole difference that TTL returns the amount of remaining time in seconds
+// while PTTL returns it in milliseconds.
 func (r *Redis) PTTL(key string) (int64, error) {
 	rp, err := r.ExecuteCommand("PTTL", key)
 	if err != nil {
@@ -172,7 +177,8 @@ func (r *Redis) RandomKey() ([]byte, error) {
 // Renames key to newkey.
 // It returns an error when the source and destination names are the same, or when key does not exist.
 // If newkey already exists it is overwritten, when this happens RENAME executes an implicit DEL operation,
-// so if the deleted key contains a very big value it may cause high latency even if RENAME itself is usually a constant-time operation.
+// so if the deleted key contains a very big value it may cause high latency
+// even if RENAME itself is usually a constant-time operation.
 func (r *Redis) Rename(key, newkey string) error {
 	rp, err := r.ExecuteCommand("RENAME", key, newkey)
 	if err != nil {
@@ -191,7 +197,8 @@ func (r *Redis) Renamenx(key, newkey string) (bool, error) {
 	return rp.BoolValue()
 }
 
-// Create a key associated with a value that is obtained by deserializing the provided serialized value (obtained via DUMP).
+// Create a key associated with a value that is obtained by deserializing
+// the provided serialized value (obtained via DUMP).
 // If ttl is 0 the key is created without any expire, otherwise the specified expire time (in milliseconds) is set.
 // RESTORE checks the RDB version and data checksum. If they don't match an error is returned.
 func (r *Redis) Restore(key string, ttl int, serialized string) error {

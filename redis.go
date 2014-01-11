@@ -5,7 +5,7 @@
 // A client connects to a Redis server creating a TCP connection to the port 6379.
 // Every Redis command or data transmitted by the client and the server is terminated by \r\n (CRLF).
 //
-// A Status Reply (or: single line reply) is in the form of a single line string starting with "+" terminated by "\r\n".
+// A Status Reply is in the form of a single line string starting with "+" terminated by "\r\n".
 //
 // Error Replies are very similar to Status Replies. The only difference is that the first byte is "-".
 //

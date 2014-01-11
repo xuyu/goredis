@@ -11,8 +11,10 @@ import (
 // If key does not exist, a new sorted set with the specified members as sole members is created,
 // like if the sorted set was empty.
 // If the key exists but does not hold a sorted set, an error is returned.
+//
 // Return value:
-// The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
+// The number of elements added to the sorted sets,
+// not including elements already existing for which the score was updated.
 func (r *Redis) ZAdd(key string, pairs map[string]float64) (int64, error) {
 	args := packArgs("ZADD", key)
 	for member, score := range pairs {
@@ -76,7 +78,8 @@ ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGG
 // The elements are considered to be ordered from the lowest to the highest score.
 // Lexicographical order is used for elements with equal score.
 // Multi-bulk reply: list of elements in the specified range.(optionally with their scores).
-// It is possible to pass the WITHSCORES option in order to return the scores of the elements together with the elements.
+// It is possible to pass the WITHSCORES option in order to return the scores of the elements
+// together with the elements.
 // The returned list will contain value1,score1,...,valueN,scoreN instead of value1,...,valueN.
 func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, error) {
 	args := []interface{}{"ZRANGE", key, start, stop}

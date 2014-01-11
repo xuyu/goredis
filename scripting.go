@@ -32,7 +32,8 @@ func (r *Redis) ScriptKill() error {
 }
 
 // Load a script into the scripts cache, without executing it.
-// After the specified command is loaded into the script cache it will be callable using EVALSHA with the correct SHA1 digest of the script,
+// After the specified command is loaded into the script cache
+// it will be callable using EVALSHA with the correct SHA1 digest of the script,
 // exactly like after the first successful invocation of EVAL.
 // Bulk reply This command returns the SHA1 digest of the script added into the script cache.
 func (r *Redis) ScriptLoad(script string) (string, error) {
@@ -46,8 +47,10 @@ func (r *Redis) ScriptLoad(script string) (string, error) {
 // The first argument of EVAL is a Lua 5.1 script.
 // The script does not need to define a Lua function (and should not).
 // It is just a Lua program that will run in the context of the Redis server.
-// The second argument of EVAL is the number of arguments that follows the script (starting from the third argument) that represent Redis key names.
-// This arguments can be accessed by Lua using the KEYS global variable in the form of a one-based array (so KEYS[1], KEYS[2], ...).
+// The second argument of EVAL is the number of arguments that follows the script
+// (starting from the third argument) that represent Redis key names.
+// This arguments can be accessed by Lua using the KEYS global variable
+// in the form of a one-based array (so KEYS[1], KEYS[2], ...).
 func (r *Redis) Eval(script string, keys []string, args []string) (*Reply, error) {
 	cmds := packArgs("EVAL", script, len(keys), keys, args)
 	return r.ExecuteCommand(cmds...)

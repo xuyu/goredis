@@ -24,8 +24,10 @@ func (r *Redis) BgSave() error {
 }
 
 // The CLIENT KILL command closes a given client connection identified by ip:port.
-// Due to the single-treaded nature of Redis, it is not possible to kill a client connection while it is executing a command.
-// However, the client will notice the connection has been closed only when the next command is sent (and results in network error).
+// Due to the single-treaded nature of Redis,
+// it is not possible to kill a client connection while it is executing a command.
+// However, the client will notice the connection has been closed
+// only when the next command is sent (and results in network error).
 // Status code reply: OK if the connection exists and has been closed
 func (r *Redis) ClientKill(ip string, port int) error {
 	rp, err := r.ExecuteCommand("CLIENT", "KILL", net.JoinHostPort(ip, strconv.Itoa(port)))
@@ -35,7 +37,8 @@ func (r *Redis) ClientKill(ip string, port int) error {
 	return rp.OKValue()
 }
 
-// The CLIENT LIST command returns information and statistics about the client connections server in a mostly human readable format.
+// The CLIENT LIST command returns information and statistics
+// about the client connections server in a mostly human readable format.
 // Bulk reply: a unique string, formatted as follows:
 // One client connection per line (separated by LF)
 // Each line is composed of a succession of property=value fields separated by a space character.
@@ -210,10 +213,12 @@ func (m *MonitorCommand) Close() error {
 	return m.conn.SendCommand("QUIT")
 }
 
-// The SAVE commands performs a synchronous save of the dataset producing a point in time snapshot of all the data inside the Redis instance,
+// The SAVE commands performs a synchronous save of the dataset
+// producing a point in time snapshot of all the data inside the Redis instance,
 // in the form of an RDB file.
 //
-// You almost never want to call SAVE in production environments where it will block all the other clients. Instead usually BGSAVE is used.
+// You almost never want to call SAVE in production environments
+// where it will block all the other clients. Instead usually BGSAVE is used.
 func (r *Redis) Save() error {
 	rp, err := r.ExecuteCommand("SAVE")
 	if err != nil {
@@ -247,12 +252,16 @@ func (r *Redis) Shutdown(save, no_save bool) error {
 // The SLAVEOF command can change the replication settings of a slave on the fly.
 // If a Redis server is already acting as slave, the command SLAVEOF NO ONE will turn off the replication,
 // turning the Redis server into a MASTER.
-// In the proper form SLAVEOF hostname port will make the server a slave of another server listening at the specified hostname and port.
+// In the proper form SLAVEOF hostname port will make the server a slave of
+// another server listening at the specified hostname and port.
 //
 // If a server is already a slave of some master,
-// SLAVEOF hostname port will stop the replication against the old server and start the synchronization against the new one, discarding the old dataset.
-// The form SLAVEOF NO ONE will stop replication, turning the server into a MASTER, but will not discard the replication.
-// So, if the old master stops working, it is possible to turn the slave into a master and set the application to use this new master in read/write.
+// SLAVEOF hostname port will stop the replication against the old server
+// and start the synchronization against the new one, discarding the old dataset.
+// The form SLAVEOF NO ONE will stop replication, turning the server into a MASTER,
+// but will not discard the replication.
+// So, if the old master stops working,
+// it is possible to turn the slave into a master and set the application to use this new master in read/write.
 // Later when the other Redis server is fixed, it can be reconfigured to work as a slave.
 func (r *Redis) SlaveOf(host, port string) error {
 	rp, err := r.ExecuteCommand("SLAVEOF", host, port)
