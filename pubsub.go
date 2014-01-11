@@ -45,14 +45,17 @@ func (p *PubSub) Close() error {
 // Format of pushed messages
 // A message is a Multi-bulk reply with three elements.
 // The first element is the kind of message:
+//
 // subscribe: means that we successfully subscribed to the channel given as the second element in the reply.
-// 		The third argument represents the number of channels we are currently subscribed to.
+// The third argument represents the number of channels we are currently subscribed to.
+//
 // unsubscribe: means that we successfully unsubscribed from the channel given as second element in the reply.
-//		The third argument represents the number of channels we are currently subscribed to.
-// 		When the last argument is zero, we are no longer subscribed to any channel,
-// 		and the client can issue any kind of Redis command as we are outside the Pub/Sub state.
+// third argument represents the number of channels we are currently subscribed to.
+// When the last argument is zero, we are no longer subscribed to any channel,
+// and the client can issue any kind of Redis command as we are outside the Pub/Sub state.
+//
 // message: it is a message received as result of a PUBLISH command issued by another client.
-//		The second element is the name of the originating channel, and the third argument is the actual message payload.
+// The second element is the name of the originating channel, and the third argument is the actual message payload.
 func (p *PubSub) Receive() ([]string, error) {
 	rp, err := p.conn.RecvReply()
 	if err != nil {
