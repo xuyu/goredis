@@ -70,9 +70,21 @@ func (r *Redis) ZIncrBy(key string, increment float64, member string) (float64, 
 	return score, nil
 }
 
-/*
-ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
-*/
+// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+func (r *Redis) ZInterStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
+	args := packArgs("ZINTERSTORE", destination, len(keys), keys)
+	if weights != nil && len(weights) > 0 {
+		args = append(args, "WEIGHTS", weights)
+	}
+	if aggregate != "" {
+		args = append(args, "AGGREGATE", aggregate)
+	}
+	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
 
 // Returns the specified range of elements in the sorted set stored at key.
 // The elements are considered to be ordered from the lowest to the highest score.
@@ -93,9 +105,21 @@ func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, 
 	return rp.ListValue()
 }
 
-/*
-ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
-*/
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (r *Redis) ZRangeByScore(key, min, max string, withscores, limit bool, offset, count int) ([]string, error) {
+	args := packArgs("ZRANGEBYSCORE", key, min, max)
+	if withscores {
+		args = append(args, "WITHSCORES")
+	}
+	if limit {
+		args = append(args, "LIMIT", offset, count)
+	}
+	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.ListValue()
+}
 
 // Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
 // The rank (or index) is 0-based, which means that the member with the lowest score has rank 0.
@@ -172,9 +196,21 @@ func (r *Redis) ZRevRange(key string, start, stop int, withscores bool) ([]strin
 	return rp.ListValue()
 }
 
-/*
-ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
-*/
+// ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
+func (r *Redis) ZRevRangeByScore(key, max, min string, withscores, limit bool, offset, count int) ([]string, error) {
+	args := packArgs("ZREVRANGEBYSCORE", key, max, min)
+	if withscores {
+		args = append(args, "WITHSCORES")
+	}
+	if limit {
+		args = append(args, "LIMIT", offset, count)
+	}
+	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.ListValue()
+}
 
 // Returns the rank of member in the sorted set stored at key,
 // with the scores ordered from high to low. The rank (or index) is 0-based,
@@ -207,9 +243,21 @@ func (r *Redis) ZScore(key, member string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
-/*
-ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
-*/
+// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+func (r *Redis) ZUnionStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
+	args := packArgs("ZUNIONSTORE", destination, len(keys), keys)
+	if weights != nil && len(weights) > 0 {
+		args = append(args, "WEIGHTS", weights)
+	}
+	if aggregate != "" {
+		args = append(args, "AGGREGATE", aggregate)
+	}
+	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
 
 // ZSCAN key cursor [MATCH pattern] [COUNT count]
 func (r *Redis) ZScan(key string, cursor uint64, pattern string, count int) (uint64, []string, error) {

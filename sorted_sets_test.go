@@ -231,3 +231,67 @@ func TestZScan(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestZInterStore(t *testing.T) {
+	r.Del("zset1", "zset2")
+	r.ZAdd("zset1", map[string]float64{
+		"one": 1,
+		"two": 2,
+	})
+	r.ZAdd("zset2", map[string]float64{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	})
+	if n, err := r.ZInterStore("out", []string{"zset1", "zset2"}, []int{2, 3}, ""); err != nil {
+		t.Error(err)
+	} else if n != 2 {
+		t.Fail()
+	}
+}
+
+func TestZUnionStore(t *testing.T) {
+	r.Del("zset1", "zset2")
+	r.ZAdd("zset1", map[string]float64{
+		"one": 1,
+		"two": 2,
+	})
+	r.ZAdd("zset2", map[string]float64{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	})
+	if n, err := r.ZUnionStore("out", []string{"zset1", "zset2"}, []int{2, 3}, ""); err != nil {
+		t.Error(err)
+	} else if n != 3 {
+		t.Fail()
+	}
+}
+
+func TestZRangeByScore(t *testing.T) {
+	r.Del("key")
+	r.ZAdd("key", map[string]float64{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	})
+	if result, err := r.ZRangeByScore("key", "-inf", "+inf", false, false, 0, 0); err != nil {
+		t.Error(err)
+	} else if len(result) != 3 {
+		t.Fail()
+	}
+}
+
+func TestZRevRangeByScore(t *testing.T) {
+	r.Del("key")
+	r.ZAdd("key", map[string]float64{
+		"one":   1,
+		"two":   2,
+		"three": 3,
+	})
+	if result, err := r.ZRevRangeByScore("key", "(2", "(1", false, false, 0, 0); err != nil {
+		t.Error(err)
+	} else if len(result) != 0 {
+		t.Fail()
+	}
+}
