@@ -2,6 +2,7 @@ package goredis
 
 import (
 	"testing"
+	"time"
 )
 
 func TestBgRewriteAof(t *testing.T) {
@@ -34,6 +35,14 @@ func TestDBSize(t *testing.T) {
 	}
 }
 
+func TestDebugObject(t *testing.T) {
+	r.Del("key")
+	r.LPush("key", "value")
+	if _, err := r.DebugObject("key"); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestFlushAll(t *testing.T) {
 	if err := r.FlushAll(); err != nil {
 		t.Error(err)
@@ -55,8 +64,55 @@ func TestLastSave(t *testing.T) {
 	}
 }
 
+func TestMonitor(t *testing.T) {
+	quit := false
+	m, err := r.Monitor()
+	if err != nil {
+		t.Error(err)
+	}
+	defer m.Close()
+	go func() {
+		for {
+			if s, err := m.Receive(); err != nil {
+				if !quit {
+					t.Error(err)
+				}
+			} else if s == "" {
+				t.Fail()
+			}
+		}
+	}()
+	time.Sleep(100 * time.Millisecond)
+	r.LPush("key", "value")
+	time.Sleep(100 * time.Microsecond)
+}
+
 func TestSave(t *testing.T) {
 	if err := r.Save(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSlowLogGet(t *testing.T) {
+	r.Del("key")
+	r.LPush("key", "value")
+	if result, err := r.SlowLogGet(1); err != nil {
+		t.Error(err)
+	} else if len(result) > 1 {
+		t.Fail()
+	}
+}
+
+func TestSlowLogLen(t *testing.T) {
+	r.Del("key")
+	r.LPush("key", "value")
+	if _, err := r.SlowLogLen(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSlowLogReset(t *testing.T) {
+	if err := r.SlowLogReset(); err != nil {
 		t.Error(err)
 	}
 }
