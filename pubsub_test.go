@@ -82,6 +82,7 @@ func TestPSubscribe(t *testing.T) {
 }
 
 func TestUnSubscribe(t *testing.T) {
+	quit := false
 	ch := make(chan bool)
 	sub, err := r.PubSub()
 	if err != nil {
@@ -91,7 +92,9 @@ func TestUnSubscribe(t *testing.T) {
 	go func() {
 		for {
 			if _, err := sub.Receive(); err != nil {
-				t.Error(err)
+				if !quit {
+					t.Error(err)
+				}
 			}
 			ch <- true
 		}
@@ -112,9 +115,11 @@ func TestUnSubscribe(t *testing.T) {
 	if len(sub.Channels) != 0 {
 		t.Fail()
 	}
+	quit = true
 }
 
 func TestPUnSubscribe(t *testing.T) {
+	quit := false
 	ch := make(chan bool)
 	sub, err := r.PubSub()
 	if err != nil {
@@ -124,7 +129,9 @@ func TestPUnSubscribe(t *testing.T) {
 	go func() {
 		for {
 			if _, err := sub.Receive(); err != nil {
-				t.Error(err)
+				if !quit {
+					t.Error(err)
+				}
 			}
 			ch <- true
 		}
@@ -145,4 +152,5 @@ func TestPUnSubscribe(t *testing.T) {
 	if len(sub.Patterns) != 0 {
 		t.Fail()
 	}
+	quit = true
 }
