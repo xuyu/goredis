@@ -90,6 +90,26 @@ func TestMove(t *testing.T) {
 	}
 }
 
+func TestObject(t *testing.T) {
+	r.Del("key")
+	r.LPush("key", "hello world")
+	if rp, err := r.Object("refcount", "key"); err != nil {
+		t.Error(err)
+	} else if rp.Type != IntegerReply {
+		t.Fail()
+	}
+	if rp, err := r.Object("encoding", "key"); err != nil {
+		t.Error(err)
+	} else if rp.Type != BulkReply {
+		t.Fail()
+	}
+	if rp, err := r.Object("idletime", "key"); err != nil {
+		t.Error(err)
+	} else if rp.Type != IntegerReply {
+		t.Fail()
+	}
+}
+
 func TestPersist(t *testing.T) {
 	r.Set("key", "value", 0, 0, false, false)
 	r.Expire("key", 500)
