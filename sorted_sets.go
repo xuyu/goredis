@@ -74,7 +74,10 @@ func (r *Redis) ZIncrBy(key string, increment float64, member string) (float64, 
 func (r *Redis) ZInterStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
 	args := packArgs("ZINTERSTORE", destination, len(keys), keys)
 	if weights != nil && len(weights) > 0 {
-		args = append(args, "WEIGHTS", weights)
+		args = append(args, "WEIGHTS")
+		for _, w := range weights {
+			args = append(args, w)
+		}
 	}
 	if aggregate != "" {
 		args = append(args, "AGGREGATE", aggregate)
@@ -247,7 +250,10 @@ func (r *Redis) ZScore(key, member string) ([]byte, error) {
 func (r *Redis) ZUnionStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
 	args := packArgs("ZUNIONSTORE", destination, len(keys), keys)
 	if weights != nil && len(weights) > 0 {
-		args = append(args, "WEIGHTS", weights)
+		args = append(args, "WEIGHTS")
+		for _, w := range weights {
+			args = append(args, w)
+		}
 	}
 	if aggregate != "" {
 		args = append(args, "AGGREGATE", aggregate)
