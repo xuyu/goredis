@@ -88,6 +88,13 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func BenchmarkGet(b *testing.B) {
+	r.Set("key", "value", 0, 0, false, false)
+	for i := 0; i < b.N; i++ {
+		r.Get("key")
+	}
+}
+
 func TestGetBit(t *testing.T) {
 	r.SetBit("key", 7, 1)
 	n, err := r.GetBit("key", 6)
@@ -145,6 +152,13 @@ func TestIncr(t *testing.T) {
 	}
 	if n != 11 {
 		t.Fail()
+	}
+}
+
+func BenchmarkIncr(b *testing.B) {
+	r.Del("key")
+	for i := 0; i < b.N; i++ {
+		r.Incr("key")
 	}
 }
 
@@ -232,6 +246,12 @@ func TestPSetex(t *testing.T) {
 func TestSet(t *testing.T) {
 	if err := r.Set("key", "value", 0, 0, false, false); err != nil {
 		t.Error(err)
+	}
+}
+
+func BenchmarkSet(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		r.Set("key", "value", 0, 0, false, false)
 	}
 }
 

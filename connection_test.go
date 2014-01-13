@@ -25,6 +25,12 @@ func TestPing(t *testing.T) {
 	}
 }
 
+func BenchmarkPing(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		r.Ping()
+	}
+}
+
 func TestQuit(t *testing.T) {
 	client, err := DialTimeout(network, address, db, password, timeout, pool)
 	if err != nil {

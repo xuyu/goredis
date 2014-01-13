@@ -123,6 +123,13 @@ func TestLPush(t *testing.T) {
 	}
 }
 
+func BenchmarkLPush(b *testing.B) {
+	r.Del("key")
+	for i := 0; i < b.N; i++ {
+		r.LPush("key", "value")
+	}
+}
+
 func TestLPushx(t *testing.T) {
 	r.Del("key")
 	if n, err := r.LPushx("key", "value"); err != nil {
@@ -148,6 +155,14 @@ func TestLRange(t *testing.T) {
 	}
 	if data, _ := r.LRange("key", 5, 10); len(data) != 0 {
 		t.Fail()
+	}
+}
+
+func BenchmarkLRange(b *testing.B) {
+	r.Del("key")
+	r.RPush("key", "one", "two", "three")
+	for i := 0; i < b.N; i++ {
+		r.LRange("key", 0, 10)
 	}
 }
 
