@@ -17,9 +17,43 @@ func TestBgSave(t *testing.T) {
 	}
 }
 
+func TestClientKill(t *testing.T) {
+	if err := r.ClientKill("127.0.0.1", 80); err == nil {
+		t.Fail()
+	}
+}
+
 func TestClientList(t *testing.T) {
 	_, err := r.ClientList()
 	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestClientGetName(t *testing.T) {
+	if _, err := r.ClientGetName(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestClientSetName(t *testing.T) {
+	if err := r.ClientSetName("name"); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestConfigGet(t *testing.T) {
+	if result, err := r.ConfigGet("daemonize"); err != nil {
+		t.Error(err)
+	} else if result == nil {
+		t.Fail()
+	} else if len(result) != 1 {
+		t.Fail()
+	}
+}
+
+func TestConfigResetStat(t *testing.T) {
+	if err := r.ConfigResetStat(); err != nil {
 		t.Error(err)
 	}
 }
@@ -51,6 +85,15 @@ func TestFlushAll(t *testing.T) {
 
 func TestFlushDB(t *testing.T) {
 	if err := r.FlushDB(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestInfo(t *testing.T) {
+	if _, err := r.Info(""); err != nil {
+		t.Error(err)
+	}
+	if _, err := r.Incr("CPU"); err != nil {
 		t.Error(err)
 	}
 }
