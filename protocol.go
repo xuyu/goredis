@@ -2,6 +2,7 @@ package goredis
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -51,8 +52,6 @@ func packCommand(args ...interface{}) ([]byte, error) {
 		switch v := arg.(type) {
 		case string:
 			s = v
-		case []byte:
-			s = string(v)
 		case int:
 			s = strconv.Itoa(v)
 		case int64:
@@ -62,7 +61,7 @@ func packCommand(args ...interface{}) ([]byte, error) {
 		case float64:
 			s = strconv.FormatFloat(v, 'g', -1, 64)
 		default:
-			s = fmt.Sprint(arg)
+			return nil, errors.New("invalid argument type when pack command")
 		}
 		if _, err := fmt.Fprintf(buf, "$%d\r\n%s\r\n", len(s), s); err != nil {
 			return nil, err
