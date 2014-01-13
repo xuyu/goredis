@@ -1,6 +1,8 @@
 goredis
 =======
 
+[![GoDoc](https://godoc.org/github.com/xuyu/goredis?status.png)](https://godoc.org/github.com/xuyu/goredis)
+
 redis client in golang
 
 [Go or Golang](http://golang.org) is an open source programming language that makes it easy to build simple, reliable, and efficient software.
