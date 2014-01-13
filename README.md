@@ -4,26 +4,26 @@ goredis
 redis client in golang
 
 [Go or Golang](http://golang.org) is an open source programming language that makes it easy to build simple, reliable, and efficient software.
+
 [Redis](http://redis.io) is an open source, BSD licensed, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+
+- Pure golang, and no other three-party libraris dependent;
+- Hight test coverage and will continue to raise;
+- Tested under Go1.2 and Redis2.8.3;
 
 
 Features
 --------
 
 * Python Redis Client Like API
-* Support Pipeling
-* Support Transaction
-* Support Publish Subscribe
-* Support Lua Eval
+* Support [Pipeling](http://godoc.org/github.com/xuyu/goredis#Pipelined)
+* Support [Transaction](http://godoc.org/github.com/xuyu/goredis#Transaction)
+* Support [Publish Subscribe](http://godoc.org/github.com/xuyu/goredis#PubSub)
+* Support [Lua Eval](http://godoc.org/github.com/xuyu/goredis#Redis.Eval)
 * Support Connection Pool
-* Support Dial URL-Like
-
+* Support [Dial URL-Like](http://godoc.org/github.com/xuyu/goredis#DialURL)
 * Support almost all commands
-* Support monitor, sort, scan, slowlog .etc
-
-* Pure golang, and no other three-party libraris dependent
-* Hight test coverage and will continue to raise
-* Tested under Go1.2 and Redis2.8.3
+* Support [monitor](http://godoc.org/github.com/xuyu/goredis#MonitorCommand), [sort](http://godoc.org/github.com/xuyu/goredis#SortCommand), [scan](http://godoc.org/github.com/xuyu/goredis#Redis.Scan), [slowlog](http://godoc.org/github.com/xuyu/goredis#SlowLog) .etc
 
 
 Document
@@ -31,7 +31,6 @@ Document
 
 - [Redis Commands](http://redis.io/commands)
 - [Redis Protocol](http://redis.io/topics/protocol)
-
 - [GoDoc](http://godoc.org/github.com/xuyu/goredis)
 
 
