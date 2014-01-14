@@ -54,7 +54,7 @@
 // Redis Pipelining is defined as:
 //  type Pipelined struct {
 //  	redis *Redis
-// 		conn  *Connection
+//  	conn  *Connection
 //  	times int
 //  }
 //  func (p *Pipelined) Close()
