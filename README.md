@@ -108,6 +108,8 @@ coverage test with html result:
 	go test -coverprofile=cover.out
 	go tool cover -html=cover.out
 
+Welcome to report issues :)
+
 
 Run Benchmark
 -------------
@@ -123,7 +125,7 @@ At my virtualbox Ubuntu 13.04 with single CPU: Intel(R) Core(TM) i5-3450 CPU @ 3
 	BenchmarkIncr	   50000	     44460 ns/op
 	BenchmarkSet	   50000	     41300 ns/op
 
-Welcome to show your benchmark result:)
+Welcome to show your benchmark result :)
 
 
 License

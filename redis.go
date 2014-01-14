@@ -63,7 +63,7 @@
 //  func (p *Pipelined) ReceiveAll() ([]*Reply, error)
 //
 // Transaction, Lua Eval, Publish/Subscribe, Monitor, Scan, Sort are also supported.
-
+//
 package goredis
 
 import (
