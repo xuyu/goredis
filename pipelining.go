@@ -24,8 +24,7 @@ func (p *Pipelined) Close() {
 }
 
 func (p *Pipelined) Command(args ...interface{}) error {
-	args2 := packArgs(args...)
-	err := p.conn.SendCommand(args2...)
+	err := p.conn.SendCommand(args...)
 	if err == nil {
 		p.times++
 	}

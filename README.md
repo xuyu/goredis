@@ -36,10 +36,77 @@ Document
 - [GoDoc](http://godoc.org/github.com/xuyu/goredis)
 
 
+Simple Example
+--------------
+
+Connect:
+
+	client, err := DialTimeout("tcp", "127.0.0.1:6379", 0, "", 10*time.Second, 10)
+	client, err := DialURL("redis://auth:password@127.0.0.1:6379/0?timeout=10s&size=10")
+
+Try a redis command is simple too, let's do GET/SET:
+
+	err := client.Set("key", "value", 0, 0, false, false)
+	value, err := client.Get("key")
+
+Or you can execute customer command with Redis.ExecuteCommand method:
+
+	reply, err := client.ExecuteCommand("SET", "key", "value")
+	err := reply.OKValue()
+
+And then a Reply struct which represent the redis response data is defined:
+	
+	type Reply struct {
+		Type    int
+		Error   string
+		Status  string
+		Integer int64  // Support Redis 64bit integer
+		Bulk    []byte // Support Redis Null Bulk Reply
+		Multi   []*Reply
+	}
+
+Reply.Type is defined as:
+
+	const (
+		ErrorReply = iota
+		StatusReply
+		IntegerReply
+		BulkReply
+		MultiReply
+	)
+
+Reply struct has many useful methods:
+
+	func (rp *Reply) IntegerValue() (int64, error)
+	func (rp *Reply) BoolValue() (bool, error)
+	func (rp *Reply) StatusValue() (string, error)
+	func (rp *Reply) OKValue() error
+	func (rp *Reply) BytesValue() ([]byte, error)
+	func (rp *Reply) StringValue() (string, error)
+	func (rp *Reply) MultiValue() ([]*Reply, error)
+	func (rp *Reply) HashValue() (map[string]string, error)
+	func (rp *Reply) ListValue() ([]string, error)
+	func (rp *Reply) BytesArrayValue() ([][]byte, error)
+	func (rp *Reply) BoolArrayValue() ([]bool, error)
+
+You can find more examples in test files.
+
+
 Run Test
 --------
 
-	go test -test.timeout=10s -test.cpu=4 -cover
+normal test:
+
+	go test
+
+coverage test:
+
+	go test -cover
+
+coverage test with html result:
+
+	go test -coverprofile=cover.out
+	go tool cover -html=cover.out
 
 
 Run Benchmark
@@ -55,6 +122,8 @@ At my virtualbox Ubuntu 13.04 with single CPU: Intel(R) Core(TM) i5-3450 CPU @ 3
 	BenchmarkGet	   50000	     37948 ns/op
 	BenchmarkIncr	   50000	     44460 ns/op
 	BenchmarkSet	   50000	     41300 ns/op
+
+Welcome to show your benchmark result:)
 
 
 License
