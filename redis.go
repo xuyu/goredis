@@ -150,3 +150,7 @@ func (r *Redis) NewConnection() (*Connection, error) {
 	}
 	return c, nil
 }
+
+func (r *Redis) ClosePool() {
+	r.pool.Close()
+}
