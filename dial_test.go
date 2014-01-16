@@ -15,11 +15,11 @@ func TestDialFail(t *testing.T) {
 }
 
 func TestDiaURL(t *testing.T) {
-	r, err := DialURL(fmt.Sprintf(format, password, address, -1, MAX_CONNECTIONS+1, timeout.String()))
+	r, err := DialURL(fmt.Sprintf(format, password, address, -1, 1, timeout.String()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.db != 0 || r.size != MAX_CONNECTIONS || r.timeout != timeout {
+	if r.db != 0 || r.size != 1 || r.timeout != timeout {
 		t.Fail()
 	}
 }

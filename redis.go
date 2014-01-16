@@ -71,11 +71,6 @@ import (
 	"time"
 )
 
-var (
-	// Max connections of one redis client connection pool
-	MAX_CONNECTIONS = 1024
-)
-
 type Redis struct {
 	network  string
 	address  string

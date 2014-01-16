@@ -11,8 +11,6 @@ import (
 func DialTimeout(network, address string, db int, password string, timeout time.Duration, size int) (*Redis, error) {
 	if size < 1 {
 		size = 1
-	} else if size > MAX_CONNECTIONS {
-		size = MAX_CONNECTIONS
 	}
 	if db < 0 {
 		db = 0
