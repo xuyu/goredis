@@ -14,6 +14,7 @@ func TestDialTimeout(t *testing.T) {
 	} else if err := redis.Ping(); err != nil {
 		t.Error(err)
 	}
+	redis.pool.Close()
 }
 
 func TestDiaURL(t *testing.T) {
@@ -23,4 +24,5 @@ func TestDiaURL(t *testing.T) {
 	} else if err := redis.Ping(); err != nil {
 		t.Error(err)
 	}
+	redis.pool.Close()
 }

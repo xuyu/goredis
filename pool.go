@@ -2,6 +2,7 @@ package goredis
 
 import (
 	"container/list"
+	"errors"
 	"sync"
 )
 
@@ -10,6 +11,7 @@ type ConnPool struct {
 	Dial    func() (*Connection, error)
 	idle    *list.List
 	active  int
+	closed  bool
 	mutex   sync.Mutex
 }
 
@@ -21,9 +23,21 @@ func NewConnPool(maxidle int, dial func() (*Connection, error)) *ConnPool {
 	}
 }
 
+func (p *ConnPool) Close() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.closed = true
+	for e := p.idle.Front(); e != nil; e = e.Next() {
+		e.Value.(*Connection).Close()
+	}
+}
+
 func (p *ConnPool) Get() (*Connection, error) {
 	p.mutex.Lock()
 	p.active++
+	if p.closed {
+		return nil, errors.New("connection pool closed")
+	}
 	if p.idle.Len() > 0 {
 		back := p.idle.Back()
 		p.idle.Remove(back)
@@ -38,6 +52,10 @@ func (p *ConnPool) Put(c *Connection) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.active--
+	if p.closed {
+		c.Close()
+		return
+	}
 	if c == nil {
 		return
 	}

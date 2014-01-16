@@ -13,6 +13,10 @@ type Connection struct {
 	Reader *bufio.Reader
 }
 
+func (c *Connection) Close() error {
+	return c.Conn.Close()
+}
+
 func (c *Connection) SendCommand(args ...interface{}) error {
 	request, err := packCommand(args...)
 	if err != nil {
