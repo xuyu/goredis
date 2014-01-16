@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var format = "redis://auth:%s@%s/%d?size=%d&timeout=%s"
+var format = "redis://auth:%s@%s/%d?maxidle=%d&timeout=%s"
 
 func TestDialFail(t *testing.T) {
 	_, err := DialTimeout(network, address+"0", db, password, timeout, 0)
@@ -15,25 +15,25 @@ func TestDialFail(t *testing.T) {
 }
 
 func TestDiaURL(t *testing.T) {
-	r, err := DialURL(fmt.Sprintf(format, password, address, -1, 1, timeout.String()))
+	r, err := DialURL(fmt.Sprintf(format, password, address, 0, 1, timeout.String()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.db != 0 || r.size != 1 || r.timeout != timeout {
+	if r.db != 0 || r.timeout != timeout {
 		t.Fail()
 	}
 }
 
 func TestDialURLFail(t *testing.T) {
-	_, err := DialURL(fmt.Sprintf("tcp://%s/%d?size=%d&timeout=%s", address, db, pool, timeout.String()))
+	_, err := DialURL(fmt.Sprintf("tcp://%s/%d?maxidle=%d&timeout=%s", address, db, maxidle, timeout.String()))
 	if err == nil {
 		t.Error("1")
 	}
-	_, err = DialURL(fmt.Sprintf("redis://auth:%s@%s/%d?size=%d&timeout=%s", password+"password", address, db, pool, timeout.String()))
+	_, err = DialURL(fmt.Sprintf("redis://auth:%s@%s/%d?maxidle=%d&timeout=%s", password+"password", address, db, maxidle, timeout.String()))
 	if err == nil {
 		t.Error("2")
 	}
-	_, err = DialURL(fmt.Sprintf("redis://%s/?size=%d&timeout=%s", address, pool, timeout.String()))
+	_, err = DialURL(fmt.Sprintf("redis://%s/?maxidle=%d&timeout=%s", address, maxidle, timeout.String()))
 	if err == nil {
 		t.Error("3")
 	}

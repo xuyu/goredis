@@ -10,12 +10,12 @@ var (
 	db       = 1
 	password = ""
 	timeout  = 5 * time.Second
-	pool     = 5
+	maxidle  = 1
 	r        *Redis
 )
 
 func init() {
-	client, err := DialTimeout(network, address, db, password, timeout, pool)
+	client, err := DialTimeout(network, address, db, password, timeout, maxidle)
 	if err != nil {
 		panic(err)
 	}
