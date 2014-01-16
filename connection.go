@@ -97,17 +97,6 @@ func (c *Connection) ReadBulk(size int) ([]byte, error) {
 	return buf[:size], nil
 }
 
-// If password matches the password in the configuration file,
-// the server replies with the OK status code and starts accepting commands.
-// Otherwise, an error is returned and the clients needs to try a new password.
-func (r *Redis) Auth(password string) error {
-	rp, err := r.ExecuteCommand("AUTH", password)
-	if err != nil {
-		return err
-	}
-	return rp.OKValue()
-}
-
 // Returns message.
 func (r *Redis) Echo(message string) (string, error) {
 	rp, err := r.ExecuteCommand("ECHO", message)
@@ -121,45 +110,4 @@ func (r *Redis) Echo(message string) (string, error) {
 func (r *Redis) Ping() error {
 	_, err := r.ExecuteCommand("PING")
 	return err
-}
-
-// Ask the server to close the all connections.
-// The connections is closed as soon as all pending replies have been written to the client.
-func (r *Redis) Quit() error {
-	for i := 0; i < r.size; i++ {
-		c := <-r.pool
-		if c != nil {
-			if err := c.SendCommand("QUIT"); err != nil {
-				return err
-			}
-			rp, err := c.RecvReply()
-			if err != nil {
-				return err
-			}
-			if err := rp.OKValue(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// Change the selected database for the all connections.
-func (r *Redis) Select(index int) error {
-	for i := 0; i < r.size; i++ {
-		c := <-r.pool
-		if c != nil {
-			if err := c.SendCommand("SELECT", index); err != nil {
-				return err
-			}
-			rp, err := c.RecvReply()
-			if err != nil {
-				return err
-			}
-			if err := rp.OKValue(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
