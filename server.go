@@ -184,7 +184,7 @@ type MonitorCommand struct {
 }
 
 func (r *Redis) Monitor() (*MonitorCommand, error) {
-	c, err := r.openConnection()
+	c, err := r.pool.Get()
 	if err != nil {
 		return nil, err
 	}

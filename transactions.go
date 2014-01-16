@@ -15,23 +15,23 @@ type Transaction struct {
 }
 
 func (r *Redis) Transaction() (*Transaction, error) {
-	c, err := r.getConnection()
+	c, err := r.pool.Get()
 	if err != nil {
 		return nil, err
 	}
 	if err := c.SendCommand("MULTI"); err != nil {
-		r.activeConnection(c)
+		r.pool.Put(c)
 		return nil, err
 	}
 	if _, err := c.RecvReply(); err != nil {
-		r.activeConnection(c)
+		r.pool.Put(c)
 		return nil, err
 	}
 	return &Transaction{r, c}, nil
 }
 
 func (t *Transaction) Close() {
-	t.redis.activeConnection(t.conn)
+	t.redis.pool.Put(t.conn)
 }
 
 // Flushes all previously queued commands in a transaction and restores the connection state to normal.

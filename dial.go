@@ -8,30 +8,20 @@ import (
 	"time"
 )
 
-func DialTimeout(network, address string, db int, password string, timeout time.Duration, size int) (*Redis, error) {
-	if size < 1 {
-		size = 1
-	}
-	if db < 0 {
-		db = 0
-	}
+func DialTimeout(network, address string, db int, password string, timeout time.Duration, maxidle int) (*Redis, error) {
 	r := &Redis{
 		network:  network,
 		address:  address,
 		db:       db,
 		password: password,
 		timeout:  timeout,
-		size:     size,
-		pool:     make(chan *Connection, size),
 	}
-	for i := 0; i < size; i++ {
-		r.pool <- nil
-	}
-	c, err := r.getConnection()
+	r.pool = NewConnPool(maxidle, r.NewConnection)
+	c, err := r.NewConnection()
 	if err != nil {
 		return nil, err
 	}
-	r.activeConnection(c)
+	r.pool.Put(c)
 	return r, nil
 }
 
@@ -60,9 +50,9 @@ func DialURL(rawurl string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
-	size, err := strconv.Atoi(ul.Query().Get("size"))
+	maxidle, err := strconv.Atoi(ul.Query().Get("maxidle"))
 	if err != nil {
 		return nil, err
 	}
-	return DialTimeout(network, address, db, password, timeout, size)
+	return DialTimeout(network, address, db, password, timeout, maxidle)
 }

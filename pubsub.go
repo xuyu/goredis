@@ -26,7 +26,7 @@ type PubSub struct {
 }
 
 func (r *Redis) PubSub() (*PubSub, error) {
-	c, err := r.openConnection()
+	c, err := r.pool.Get()
 	if err != nil {
 		return nil, err
 	}

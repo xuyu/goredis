@@ -67,7 +67,10 @@
 package goredis
 
 import (
+	"bufio"
+	"errors"
 	"io"
+	"net"
 	"time"
 )
 
@@ -77,13 +80,12 @@ type Redis struct {
 	db       int
 	password string
 	timeout  time.Duration
-	size     int
-	pool     chan *Connection
+	pool     *ConnPool
 }
 
 func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
-	c, err := r.getConnection()
-	defer r.activeConnection(c)
+	c, err := r.pool.Get()
+	defer r.pool.Put(c)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +93,7 @@ func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 		if err != io.EOF {
 			return nil, err
 		}
-		c, err = r.openConnection()
+		c, err = r.pool.Get()
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +106,7 @@ func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 		if err != io.EOF {
 			return nil, err
 		}
-		c, err = r.openConnection()
+		c, err = r.pool.Get()
 		if err != nil {
 			return nil, err
 		}
@@ -114,4 +116,37 @@ func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 		return c.RecvReply()
 	}
 	return rp, err
+}
+
+func (r *Redis) NewConnection() (*Connection, error) {
+	conn, err := net.DialTimeout(r.network, r.address, r.timeout)
+	if err != nil {
+		return nil, err
+	}
+	c := &Connection{conn, bufio.NewReader(conn)}
+	if r.password != "" {
+		if err := c.SendCommand("AUTH", r.password); err != nil {
+			return nil, err
+		}
+		rp, err := c.RecvReply()
+		if err != nil {
+			return nil, err
+		}
+		if rp.Type == ErrorReply {
+			return nil, errors.New(rp.Error)
+		}
+	}
+	if r.db > 0 {
+		if err := c.SendCommand("SELECT", r.db); err != nil {
+			return nil, err
+		}
+		rp, err := c.RecvReply()
+		if err != nil {
+			return nil, err
+		}
+		if rp.Type == ErrorReply {
+			return nil, errors.New(rp.Error)
+		}
+	}
+	return c, nil
 }

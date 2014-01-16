@@ -11,7 +11,7 @@ type Pipelined struct {
 }
 
 func (r *Redis) Pipelining() (*Pipelined, error) {
-	c, err := r.getConnection()
+	c, err := r.pool.Get()
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func (r *Redis) Pipelining() (*Pipelined, error) {
 }
 
 func (p *Pipelined) Close() {
-	p.redis.activeConnection(p.conn)
+	p.redis.pool.Put(p.conn)
 	p.times = 0
 }
 
