@@ -1,52 +1,48 @@
 package goredis
 
 import (
-	"bufio"
-	"errors"
-	"net"
+	"container/list"
+	"sync"
 )
 
-func (r *Redis) getConnection() (*Connection, error) {
-	c := <-r.pool
+type ConnPool struct {
+	MaxIdle int
+	Dial    func() (*Connection, error)
+	idle    *list.List
+	active  int
+	mutex   sync.Mutex
+}
+
+func NewConnPool(maxidle int, dial func() (*Connection, error)) *ConnPool {
+	return &ConnPool{
+		MaxIdle: maxidle,
+		Dial:    dial,
+		idle:    list.New(),
+	}
+}
+
+func (p *ConnPool) Get() (*Connection, error) {
+	p.mutex.Lock()
+	p.active++
+	if p.idle.Len() > 0 {
+		back := p.idle.Back()
+		p.idle.Remove(back)
+		p.mutex.Unlock()
+		return back.Value.(*Connection), nil
+	}
+	p.mutex.Unlock()
+	return p.Dial()
+}
+
+func (p *ConnPool) Put(c *Connection) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.active--
 	if c == nil {
-		return r.openConnection()
+		return
 	}
-	return c, nil
-}
-
-func (r *Redis) activeConnection(c *Connection) {
-	r.pool <- c
-}
-
-func (r *Redis) openConnection() (*Connection, error) {
-	conn, err := net.DialTimeout(r.network, r.address, r.timeout)
-	if err != nil {
-		return nil, err
+	if p.idle.Len() >= p.MaxIdle {
+		p.idle.Remove(p.idle.Front())
 	}
-	c := &Connection{conn, bufio.NewReader(conn)}
-	if r.password != "" {
-		if err := c.SendCommand("AUTH", r.password); err != nil {
-			return nil, err
-		}
-		rp, err := c.RecvReply()
-		if err != nil {
-			return nil, err
-		}
-		if rp.Type == ErrorReply {
-			return nil, errors.New(rp.Error)
-		}
-	}
-	if r.db > 0 {
-		if err := c.SendCommand("SELECT", r.db); err != nil {
-			return nil, err
-		}
-		rp, err := c.RecvReply()
-		if err != nil {
-			return nil, err
-		}
-		if rp.Type == ErrorReply {
-			return nil, errors.New(rp.Error)
-		}
-	}
-	return c, nil
+	p.idle.PushBack(c)
 }
