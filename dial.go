@@ -1,7 +1,6 @@
 package goredis
 
 import (
-	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -30,19 +29,13 @@ func DialURL(rawurl string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.ToLower(ul.Scheme) != "redis" {
-		return nil, errors.New("invalid scheme")
-	}
-	network := "tcp"
-	address := ul.Host
 	password := ""
-	path := strings.Trim(ul.Path, "/")
 	if ul.User != nil {
 		if pw, set := ul.User.Password(); set {
 			password = pw
 		}
 	}
-	db, err := strconv.Atoi(path)
+	db, err := strconv.Atoi(strings.Trim(ul.Path, "/"))
 	if err != nil {
 		return nil, err
 	}
@@ -54,5 +47,5 @@ func DialURL(rawurl string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
-	return DialTimeout(network, address, db, password, timeout, maxidle)
+	return DialTimeout(ul.Scheme, ul.Host, db, password, timeout, maxidle)
 }
