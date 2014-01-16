@@ -41,7 +41,7 @@
 //
 // Connect redis has two function: DialTimeout and DialURL, for example:
 //  client, err := DialTimeout("tcp", "127.0.0.1:6379", 0, "", 10*time.Second, 10)
-//  client, err := DialURL("redis://auth:password@127.0.0.1:6379/0?timeout=10s&size=10")
+//  client, err := DialURL("tcp://auth:password@127.0.0.1:6379/0?timeout=10s&maxidle=1")
 //
 // Try a redis command is simple too, let's do GET/SET:
 //  err := client.Set("key", "value", 0, 0, false, false)
