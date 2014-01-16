@@ -22,9 +22,8 @@ Features
 * Support [Transaction](http://godoc.org/github.com/xuyu/goredis#Transaction)
 * Support [Publish Subscribe](http://godoc.org/github.com/xuyu/goredis#PubSub)
 * Support [Lua Eval](http://godoc.org/github.com/xuyu/goredis#Redis.Eval)
-* Support Connection Pool
+* Support [Connection Pool](http://godoc.org/github.com/xuyu/goredis#ConnPool)
 * Support [Dial URL-Like](http://godoc.org/github.com/xuyu/goredis#DialURL)
-* Support almost all commands
 * Support [monitor](http://godoc.org/github.com/xuyu/goredis#MonitorCommand), [sort](http://godoc.org/github.com/xuyu/goredis#SortCommand), [scan](http://godoc.org/github.com/xuyu/goredis#Redis.Scan), [slowlog](http://godoc.org/github.com/xuyu/goredis#SlowLog) .etc
 
 
