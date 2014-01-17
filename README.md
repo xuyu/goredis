@@ -40,6 +40,8 @@ Simple Example
 
 Connect:
 
+	client, err := Dial()
+	client, err := Dial(&DialConfig{Address: "127.0.0.1:6379"})
 	client, err := DialTimeout("tcp", "127.0.0.1:6379", 0, "", 10*time.Second, 10)
 	client, err := DialURL("tcp://auth:password@127.0.0.1:6379/0?timeout=10s&maxidle=1")
 
