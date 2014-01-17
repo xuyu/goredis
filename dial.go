@@ -7,6 +7,41 @@ import (
 	"time"
 )
 
+const (
+	DefaultNetwork = "tcp"
+	DefaultAddress = ":6379"
+	DefaultTimeout = 15 * time.Second
+	DefaultMaxIdle = 1
+)
+
+type DialConfig struct {
+	Network  string
+	Address  string
+	Database int
+	Password string
+	Timeout  time.Duration
+	MaxIdle  int
+}
+
+func Dial(cfg *DialConfig) (*Redis, error) {
+	if cfg == nil {
+		cfg = &DialConfig{}
+	}
+	if cfg.Network == "" {
+		cfg.Network = DefaultNetwork
+	}
+	if cfg.Address == "" {
+		cfg.Address = DefaultAddress
+	}
+	if cfg.Timeout == 0 {
+		cfg.Timeout = DefaultTimeout
+	}
+	if cfg.MaxIdle == 0 {
+		cfg.MaxIdle = DefaultMaxIdle
+	}
+	return DialTimeout(cfg.Network, cfg.Address, cfg.Database, cfg.Password, cfg.Timeout, cfg.MaxIdle)
+}
+
 func DialTimeout(network, address string, db int, password string, timeout time.Duration, maxidle int) (*Redis, error) {
 	r := &Redis{
 		network:  network,
