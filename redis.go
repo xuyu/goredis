@@ -88,17 +88,6 @@ func packArgs(items ...interface{}) (args []interface{}) {
 	for _, item := range items {
 		v := reflect.ValueOf(item)
 		switch v.Kind() {
-		case reflect.Slice:
-			if v.IsNil() {
-				continue
-			}
-			if v.Type().Elem().Kind() == reflect.Uint8 {
-				args = append(args, string(v.Bytes()))
-			} else {
-				for i := 0; i < v.Len(); i++ {
-					args = append(args, v.Index(i).Interface())
-				}
-			}
 		case reflect.Map:
 			if v.IsNil() {
 				continue
