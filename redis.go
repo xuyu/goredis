@@ -140,10 +140,6 @@ type Connection struct {
 	Reader *bufio.Reader
 }
 
-func (c *Connection) Close() error {
-	return c.Conn.Close()
-}
-
 func (c *Connection) SendCommand(args ...interface{}) error {
 	request, err := packCommand(args...)
 	if err != nil {
@@ -231,10 +227,11 @@ func (c *Connection) ReadBulk(size int) ([]byte, error) {
 type ConnPool struct {
 	MaxIdle int
 	Dial    func() (*Connection, error)
-	idle    *list.List
-	active  int
-	closed  bool
-	mutex   sync.Mutex
+
+	idle   *list.List
+	active int
+	closed bool
+	mutex  sync.Mutex
 }
 
 func NewConnPool(maxidle int, dial func() (*Connection, error)) *ConnPool {
@@ -250,7 +247,7 @@ func (p *ConnPool) Close() {
 	defer p.mutex.Unlock()
 	p.closed = true
 	for e := p.idle.Front(); e != nil; e = e.Next() {
-		e.Value.(*Connection).Close()
+		e.Value.(*Connection).Conn.Close()
 	}
 }
 
@@ -275,7 +272,7 @@ func (p *ConnPool) Put(c *Connection) {
 	defer p.mutex.Unlock()
 	p.active--
 	if p.closed {
-		c.Close()
+		c.Conn.Close()
 		return
 	}
 	if c == nil {
