@@ -93,8 +93,7 @@ func packArgs(items ...interface{}) (args []interface{}) {
 				continue
 			}
 			for _, key := range v.MapKeys() {
-				value := v.MapIndex(key)
-				args = append(args, key.Interface(), value.Interface())
+				args = append(args, key.Interface(), v.MapIndex(key).Interface())
 			}
 		case reflect.String:
 			if v.String() != "" {
@@ -112,8 +111,8 @@ func packCommand(args ...interface{}) ([]byte, error) {
 	if _, err := fmt.Fprintf(buf, "*%d\r\n", len(args)); err != nil {
 		return nil, err
 	}
+	var s string
 	for _, arg := range args {
-		var s string
 		switch v := arg.(type) {
 		case string:
 			s = v
