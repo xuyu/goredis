@@ -75,6 +75,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/url"
 	"reflect"
@@ -84,10 +85,45 @@ import (
 	"time"
 )
 
+type bufferPool struct {
+	bufs  []*bytes.Buffer
+	mutex sync.Mutex
+}
+
+func (b *bufferPool) GetBuffer() *bytes.Buffer {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if len(b.bufs) > 0 {
+		buf := b.bufs[0]
+		b.bufs[0] = nil
+		b.bufs = b.bufs[1:]
+		return buf
+	}
+	return bytes.NewBuffer(nil)
+}
+
+func (b *bufferPool) PutBuffer(buf *bytes.Buffer) {
+	b.mutex.Lock()
+	if len(b.bufs) < math.MaxInt16 {
+		buf.Reset()
+		b.bufs = append(b.bufs, buf)
+	}
+	b.mutex.Unlock()
+}
+
+var buffers = &bufferPool{}
+
 func packArgs(items ...interface{}) (args []interface{}) {
 	for _, item := range items {
 		v := reflect.ValueOf(item)
 		switch v.Kind() {
+		case reflect.Slice:
+			if v.IsNil() {
+				continue
+			}
+			for i := 0; i < v.Len(); i++ {
+				args = append(args, v.Index(i).Interface())
+			}
 		case reflect.Map:
 			if v.IsNil() {
 				continue
@@ -107,7 +143,8 @@ func packArgs(items ...interface{}) (args []interface{}) {
 }
 
 func packCommand(args ...interface{}) ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
+	buf := buffers.GetBuffer()
+	defer buffers.PutBuffer(buf)
 	if _, err := fmt.Fprintf(buf, "*%d\r\n", len(args)); err != nil {
 		return nil, err
 	}
