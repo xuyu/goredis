@@ -196,7 +196,7 @@ func (r *Redis) PSetex(key string, milliseconds int, value string) error {
 // Set key to hold the string value.
 // If key already holds a value, it is overwritten, regardless of its type.
 // Any previous time to live associated with the key is discarded on successful SET operation.
-func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, must_not_exists bool) error {
+func (r *Redis) Set(key, value string, seconds, milliseconds int, mustExists, mustNotExists bool) error {
 	args := packArgs("SET", key, value)
 	if seconds > 0 {
 		args = append(args, "EX", seconds)
@@ -204,9 +204,9 @@ func (r *Redis) Set(key, value string, seconds, milliseconds int, must_exists, m
 	if milliseconds > 0 {
 		args = append(args, "PX", milliseconds)
 	}
-	if must_exists {
+	if mustExists {
 		args = append(args, "XX")
-	} else if must_not_exists {
+	} else if mustNotExists {
 		args = append(args, "NX")
 	}
 	rp, err := r.ExecuteCommand(args...)
