@@ -22,4 +22,4 @@ _testmain.go
 *.exe
 
 .tags*
-*.sublime-*
+*.sublime-workspace
