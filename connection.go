@@ -1,6 +1,6 @@
 package goredis
 
-// Returns message.
+// Echo command returns message.
 func (r *Redis) Echo(message string) (string, error) {
 	rp, err := r.ExecuteCommand("ECHO", message)
 	if err != nil {
@@ -9,7 +9,8 @@ func (r *Redis) Echo(message string) (string, error) {
 	return rp.StringValue()
 }
 
-// Returns PONG. This command is often used to test if a connection is still alive, or to measure latency.
+// Ping command returns PONG.
+// This command is often used to test if a connection is still alive, or to measure latency.
 func (r *Redis) Ping() error {
 	_, err := r.ExecuteCommand("PING")
 	return err
