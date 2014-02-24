@@ -171,12 +171,12 @@ func packCommand(args ...interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type Connection struct {
+type connection struct {
 	Conn   net.Conn
 	Reader *bufio.Reader
 }
 
-func (c *Connection) SendCommand(args ...interface{}) error {
+func (c *connection) SendCommand(args ...interface{}) error {
 	request, err := packCommand(args...)
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (c *Connection) SendCommand(args ...interface{}) error {
 	return nil
 }
 
-func (c *Connection) RecvReply() (*Reply, error) {
+func (c *connection) RecvReply() (*Reply, error) {
 	line, err := c.Reader.ReadBytes('\n')
 	if err != nil {
 		return nil, err
@@ -248,7 +248,7 @@ func (c *Connection) RecvReply() (*Reply, error) {
 	return nil, errors.New("redis protocol error")
 }
 
-func (c *Connection) ReadBulk(size int) ([]byte, error) {
+func (c *connection) ReadBulk(size int) ([]byte, error) {
 	// If the requested value does not exist the bulk reply will use the special value -1 as data length
 	if size < 0 {
 		return nil, nil
@@ -260,9 +260,9 @@ func (c *Connection) ReadBulk(size int) ([]byte, error) {
 	return buf[:size], nil
 }
 
-type ConnPool struct {
+type connPool struct {
 	MaxIdle int
-	Dial    func() (*Connection, error)
+	Dial    func() (*connection, error)
 
 	idle   *list.List
 	active int
@@ -270,24 +270,16 @@ type ConnPool struct {
 	mutex  sync.Mutex
 }
 
-func NewConnPool(maxidle int, dial func() (*Connection, error)) *ConnPool {
-	return &ConnPool{
-		MaxIdle: maxidle,
-		Dial:    dial,
-		idle:    list.New(),
-	}
-}
-
-func (p *ConnPool) Close() {
+func (p *connPool) Close() {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.closed = true
 	for e := p.idle.Front(); e != nil; e = e.Next() {
-		e.Value.(*Connection).Conn.Close()
+		e.Value.(*connection).Conn.Close()
 	}
 }
 
-func (p *ConnPool) Get() (*Connection, error) {
+func (p *connPool) Get() (*connection, error) {
 	p.mutex.Lock()
 	p.active++
 	if p.closed {
@@ -297,13 +289,13 @@ func (p *ConnPool) Get() (*Connection, error) {
 		back := p.idle.Back()
 		p.idle.Remove(back)
 		p.mutex.Unlock()
-		return back.Value.(*Connection), nil
+		return back.Value.(*connection), nil
 	}
 	p.mutex.Unlock()
 	return p.Dial()
 }
 
-func (p *ConnPool) Put(c *Connection) {
+func (p *connPool) Put(c *connection) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.active--
@@ -326,7 +318,7 @@ type Redis struct {
 	db       int
 	password string
 	timeout  time.Duration
-	pool     *ConnPool
+	pool     *connPool
 }
 
 func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
@@ -364,12 +356,12 @@ func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 	return rp, err
 }
 
-func (r *Redis) NewConnection() (*Connection, error) {
+func (r *Redis) dialConnection() (*connection, error) {
 	conn, err := net.DialTimeout(r.network, r.address, r.timeout)
 	if err != nil {
 		return nil, err
 	}
-	c := &Connection{conn, bufio.NewReader(conn)}
+	c := &connection{conn, bufio.NewReader(conn)}
 	if r.password != "" {
 		if err := c.SendCommand("AUTH", r.password); err != nil {
 			return nil, err
@@ -444,8 +436,12 @@ func DialTimeout(network, address string, db int, password string, timeout time.
 		password: password,
 		timeout:  timeout,
 	}
-	r.pool = NewConnPool(maxidle, r.NewConnection)
-	c, err := r.NewConnection()
+	r.pool = &connPool{
+		MaxIdle: maxidle,
+		Dial:    r.dialConnection,
+		idle:    list.New(),
+	}
+	c, err := r.dialConnection()
 	if err != nil {
 		return nil, err
 	}

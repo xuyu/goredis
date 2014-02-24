@@ -180,7 +180,7 @@ func (r *Redis) LastSave() (int64, error) {
 // MONITOR is a debugging command that streams back every command processed by the Redis server.
 type MonitorCommand struct {
 	redis *Redis
-	conn  *Connection
+	conn  *connection
 }
 
 func (r *Redis) Monitor() (*MonitorCommand, error) {

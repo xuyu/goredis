@@ -19,7 +19,7 @@ func (r *Redis) Publish(channel, message string) (int64, error) {
 // http://redis.io/topics/pubsub
 type PubSub struct {
 	redis *Redis
-	conn  *Connection
+	conn  *connection
 
 	Patterns map[string]bool
 	Channels map[string]bool

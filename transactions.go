@@ -11,7 +11,7 @@ import (
 // and usually the script will be both simpler and faster.
 type Transaction struct {
 	redis *Redis
-	conn  *Connection
+	conn  *connection
 }
 
 func (r *Redis) Transaction() (*Transaction, error) {

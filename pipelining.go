@@ -6,7 +6,7 @@ package goredis
 // and finally read the replies in a single step.
 type Pipelined struct {
 	redis *Redis
-	conn  *Connection
+	conn  *connection
 	times int
 }
 
