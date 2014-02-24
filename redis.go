@@ -439,28 +439,23 @@ func Dial(cfg *DialConfig) (*Redis, error) {
 	if cfg.MaxIdle == 0 {
 		cfg.MaxIdle = DefaultMaxIdle
 	}
-	return DialTimeout(cfg.Network, cfg.Address, cfg.Database, cfg.Password, cfg.Timeout, cfg.MaxIdle)
-}
-
-// DialTimeout new a redis client with arguments
-func DialTimeout(network, address string, db int, password string, timeout time.Duration, maxidle int) (*Redis, error) {
 	r := &Redis{
-		network:  network,
-		address:  address,
-		db:       db,
-		password: password,
-		timeout:  timeout,
+		network:  cfg.Network,
+		address:  cfg.Address,
+		db:       cfg.Database,
+		password: cfg.Password,
+		timeout:  cfg.Timeout,
 	}
 	r.pool = &connPool{
-		MaxIdle: maxidle,
+		MaxIdle: cfg.MaxIdle,
 		Dial:    r.dialConnection,
 		idle:    list.New(),
 	}
-	c, err := r.dialConnection()
+	conn, err := r.dialConnection()
 	if err != nil {
 		return nil, err
 	}
-	r.pool.Put(c)
+	r.pool.Put(conn)
 	return r, nil
 }
 
@@ -488,7 +483,7 @@ func DialURL(rawurl string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
-	return DialTimeout(ul.Scheme, ul.Host, db, password, timeout, maxidle)
+	return Dial(&DialConfig{ul.Scheme, ul.Host, db, password, timeout, maxidle})
 }
 
 // Reply Type: Status, Integer, Bulk, Multi Bulk

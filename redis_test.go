@@ -19,7 +19,7 @@ var (
 )
 
 func init() {
-	client, err := DialTimeout(network, address, db, password, timeout, maxidle)
+	client, err := Dial(&DialConfig{network, address, db, password, timeout, maxidle})
 	if err != nil {
 		panic(err)
 	}
@@ -37,7 +37,7 @@ func TestDial(t *testing.T) {
 }
 
 func TestDialTimeout(t *testing.T) {
-	redis, err := DialTimeout(network, address, db, password, timeout, maxidle)
+	redis, err := Dial(&DialConfig{network, address, db, password, timeout, maxidle})
 	if err != nil {
 		t.Error(err)
 	} else if err := redis.Ping(); err != nil {
