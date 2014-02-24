@@ -1,4 +1,4 @@
-// Redis Golang Client with full features
+// Package goredis is another redis client with full features which writter in golang
 //
 // Protocol Specification: http://redis.io/topics/protocol.
 //
