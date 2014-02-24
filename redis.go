@@ -39,11 +39,21 @@
 //  func (rp *Reply) BytesArrayValue() ([][]byte, error)
 //  func (rp *Reply) BoolArrayValue() ([]bool, error)
 //
-// Connect redis has two function: DialTimeout and DialURL, for example:
+// Connect redis has two function: Dial and DialURL, for example:
 //  client, err := Dial()
 //  client, err := Dial(&DialConfig{Address: "127.0.0.1:6379"})
-//  client, err := DialTimeout("tcp", "127.0.0.1:6379", 0, "", 10*time.Second, 10)
+//  client, err := Dial(&DialConfig{"tcp", "127.0.0.1:6379", 0, "", 10*time.Second, 10})
 //  client, err := DialURL("tcp://auth:password@127.0.0.1:6379/0?timeout=10s&maxidle=1")
+//
+// DialConfig can also take named options for connection config:
+//   config := &DialConfig {
+//     Network:  "tcp",
+//     Address:  "127.0.0.1:6379",
+//     Database: 0,
+//     Password: "yourpasswordhere"
+//     Timeout:  10*time.Second,
+//     MaxIdle:  10
+//   }
 //
 // Try a redis command is simple too, let's do GET/SET:
 //  err := client.Set("key", "value", 0, 0, false, false)
