@@ -4,6 +4,7 @@ import (
 	"strconv"
 )
 
+// HDel command:
 // Removes the specified fields from the hash stored at key.
 // Specified fields that do not exist within this hash are ignored.
 // If key does not exist, it is treated as an empty hash and this command returns 0.
@@ -16,6 +17,7 @@ func (r *Redis) HDel(key string, fields ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
+// HExists command:
 // Returns if field is an existing field in the hash stored at key.
 func (r *Redis) HExists(key, field string) (bool, error) {
 	rp, err := r.ExecuteCommand("HEXISTS", key, field)
@@ -25,6 +27,7 @@ func (r *Redis) HExists(key, field string) (bool, error) {
 	return rp.BoolValue()
 }
 
+// HGet command:
 // Returns the value associated with field in the hash stored at key.
 // Bulk reply: the value associated with field,
 // or nil when field is not present in the hash or key does not exist.
@@ -36,6 +39,7 @@ func (r *Redis) HGet(key, field string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
+// HGetAll command:
 // Returns all fields and values of the hash stored at key.
 // In the returned value, every field name is followed by its value,
 // so the length of the reply is twice the size of the hash.
@@ -47,6 +51,7 @@ func (r *Redis) HGetAll(key string) (map[string]string, error) {
 	return rp.HashValue()
 }
 
+// HIncrBy command:
 // Increments the number stored at field in the hash stored at key by increment.
 // If key does not exist, a new key holding a hash is created.
 // If field does not exist the value is set to 0 before the operation is performed.
@@ -59,6 +64,7 @@ func (r *Redis) HIncrBy(key, field string, increment int) (int64, error) {
 	return rp.IntegerValue()
 }
 
+// HIncrByFloat command:
 // Increment the specified field of an hash stored at key,
 // and representing a floating point number, by the specified increment.
 // If the field does not exist, it is set to 0 before performing the operation.
@@ -78,7 +84,8 @@ func (r *Redis) HIncrByFloat(key, field string, increment float64) (float64, err
 	return strconv.ParseFloat(s, 64)
 }
 
-// eturns all field names in the hash stored at key.
+// HKeys command:
+// Returns all field names in the hash stored at key.
 // Multi-bulk reply: list of fields in the hash, or an empty list when key does not exist.
 func (r *Redis) HKeys(key string) ([]string, error) {
 	rp, err := r.ExecuteCommand("HKEYS", key)
@@ -88,6 +95,7 @@ func (r *Redis) HKeys(key string) ([]string, error) {
 	return rp.ListValue()
 }
 
+// HLen command:
 // Returns the number of fields contained in the hash stored at key.
 // Integer reply: number of fields in the hash, or 0 when key does not exist.
 func (r *Redis) HLen(key string) (int64, error) {
@@ -98,6 +106,7 @@ func (r *Redis) HLen(key string) (int64, error) {
 	return rp.IntegerValue()
 }
 
+// HMGet command:
 // Returns the values associated with the specified fields in the hash stored at key.
 // For every field that does not exist in the hash, a nil value is returned.
 // Because a non-existing keys are treated as empty hashes,
@@ -112,6 +121,7 @@ func (r *Redis) HMGet(key string, fields ...string) ([][]byte, error) {
 	return rp.BytesArrayValue()
 }
 
+// HMSet command:
 // Sets the specified fields to their respective values in the hash stored at key.
 // This command overwrites any existing fields in the hash.
 // If key does not exist, a new key holding a hash is created.
@@ -124,6 +134,7 @@ func (r *Redis) HMSet(key string, pairs map[string]string) error {
 	return rp.OKValue()
 }
 
+// HSet command:
 // Sets field in the hash stored at key to value.
 // If key does not exist, a new key holding a hash is created.
 // If field already exists in the hash, it is overwritten.
@@ -135,6 +146,7 @@ func (r *Redis) HSet(key, field, value string) (bool, error) {
 	return rp.BoolValue()
 }
 
+// HSetnx command:
 // Sets field in the hash stored at key to value, only if field does not yet exist.
 // If key does not exist, a new key holding a hash is created.
 // If field already exists, this operation has no effect.
@@ -146,6 +158,7 @@ func (r *Redis) HSetnx(key, field, value string) (bool, error) {
 	return rp.BoolValue()
 }
 
+// HVals command:
 // Returns all values in the hash stored at key.
 // Multi-bulk reply: list of values in the hash, or an empty list when key does not exist.
 func (r *Redis) HVals(key string) ([]string, error) {
@@ -156,6 +169,7 @@ func (r *Redis) HVals(key string) ([]string, error) {
 	return rp.ListValue()
 }
 
+// HScan command:
 // HSCAN key cursor [MATCH pattern] [COUNT count]
 func (r *Redis) HScan(key string, cursor uint64, pattern string, count int) (uint64, map[string]string, error) {
 	args := packArgs("HSCAN", key, cursor)
