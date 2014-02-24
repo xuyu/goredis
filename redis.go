@@ -312,6 +312,8 @@ func (p *connPool) Put(c *connection) {
 	p.idle.PushBack(c)
 }
 
+// Redis client struct
+// Containers connection parameters and connection pool
 type Redis struct {
 	network  string
 	address  string
@@ -321,6 +323,7 @@ type Redis struct {
 	pool     *connPool
 }
 
+// ExecuteCommand send any raw redis command and receive reply from redis server
 func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 	c, err := r.pool.Get()
 	defer r.pool.Put(c)
@@ -389,17 +392,27 @@ func (r *Redis) dialConnection() (*connection, error) {
 	return c, nil
 }
 
+// ClosePool close the redis client under connection pool
+// this will close all the connections which in the pool
 func (r *Redis) ClosePool() {
 	r.pool.Close()
 }
 
 const (
+	// DefaultNetwork is the default value of network
 	DefaultNetwork = "tcp"
+
+	// DefaultAddress is the default value of address(host:port)
 	DefaultAddress = ":6379"
+
+	// DefaultTimeout is the default value of connect timeout
 	DefaultTimeout = 15 * time.Second
+
+	// DefaultMaxIdle is the default value of connection pool size
 	DefaultMaxIdle = 1
 )
 
+// DialConfig is redis client connect to server parameters
 type DialConfig struct {
 	Network  string
 	Address  string
@@ -409,6 +422,7 @@ type DialConfig struct {
 	MaxIdle  int
 }
 
+// Dial new a redis client with DialConfig
 func Dial(cfg *DialConfig) (*Redis, error) {
 	if cfg == nil {
 		cfg = &DialConfig{}
@@ -428,6 +442,7 @@ func Dial(cfg *DialConfig) (*Redis, error) {
 	return DialTimeout(cfg.Network, cfg.Address, cfg.Database, cfg.Password, cfg.Timeout, cfg.MaxIdle)
 }
 
+// DialTimeout new a redis client with arguments
 func DialTimeout(network, address string, db int, password string, timeout time.Duration, maxidle int) (*Redis, error) {
 	r := &Redis{
 		network:  network,
@@ -449,6 +464,7 @@ func DialTimeout(network, address string, db int, password string, timeout time.
 	return r, nil
 }
 
+// DialURL new a redis client with URL-like argument
 func DialURL(rawurl string) (*Redis, error) {
 	ul, err := url.Parse(rawurl)
 	if err != nil {
@@ -485,7 +501,7 @@ const (
 	MultiReply
 )
 
-// Represent Redis Reply
+// Reply struct Represent Redis Reply
 type Reply struct {
 	Type    int
 	Error   string
@@ -495,6 +511,7 @@ type Reply struct {
 	Multi   []*Reply
 }
 
+// IntegerValue returns redis reply number value
 func (rp *Reply) IntegerValue() (int64, error) {
 	if rp.Type == ErrorReply {
 		return 0, errors.New(rp.Error)
@@ -505,7 +522,8 @@ func (rp *Reply) IntegerValue() (int64, error) {
 	return rp.Integer, nil
 }
 
-// Integer replies are also extensively used in order to return true or false.
+// BoolValue returns redis reply integer
+// which are also extensively used in order to return true or false.
 // For instance commands like EXISTS or SISMEMBER will return 1 for true and 0 for false.
 func (rp *Reply) BoolValue() (bool, error) {
 	if rp.Type == ErrorReply {
@@ -517,6 +535,7 @@ func (rp *Reply) BoolValue() (bool, error) {
 	return rp.Integer != 0, nil
 }
 
+// StatusValue indicates redis reply a status string
 func (rp *Reply) StatusValue() (string, error) {
 	if rp.Type == ErrorReply {
 		return "", errors.New(rp.Error)
@@ -527,6 +546,7 @@ func (rp *Reply) StatusValue() (string, error) {
 	return rp.Status, nil
 }
 
+// OKValue indicates redis reply a OK status string
 func (rp *Reply) OKValue() error {
 	if rp.Type == ErrorReply {
 		return errors.New(rp.Error)
@@ -540,6 +560,7 @@ func (rp *Reply) OKValue() error {
 	return errors.New(rp.Status)
 }
 
+// BytesValue indicates redis reply a bulk which maybe nil
 func (rp *Reply) BytesValue() ([]byte, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
@@ -550,6 +571,7 @@ func (rp *Reply) BytesValue() ([]byte, error) {
 	return rp.Bulk, nil
 }
 
+// StringValue indicates redis reply a bulk which should not be nil
 func (rp *Reply) StringValue() (string, error) {
 	if rp.Type == ErrorReply {
 		return "", errors.New(rp.Error)
@@ -563,6 +585,7 @@ func (rp *Reply) StringValue() (string, error) {
 	return string(rp.Bulk), nil
 }
 
+// MultiValue indicates redis reply a multi bulk
 func (rp *Reply) MultiValue() ([]*Reply, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
@@ -573,6 +596,7 @@ func (rp *Reply) MultiValue() ([]*Reply, error) {
 	return rp.Multi, nil
 }
 
+// HashValue indicates redis reply a multi value which represent hash map
 func (rp *Reply) HashValue() (map[string]string, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
@@ -598,6 +622,7 @@ func (rp *Reply) HashValue() (map[string]string, error) {
 	return result, nil
 }
 
+// ListValue indicates redis reply a multi value which represent list
 func (rp *Reply) ListValue() ([]string, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
@@ -618,6 +643,8 @@ func (rp *Reply) ListValue() ([]string, error) {
 	return result, nil
 }
 
+// BytesArrayValue indicates redis reply a multi value
+// which represent list, but item in the list maybe nil
 func (rp *Reply) BytesArrayValue() ([][]byte, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
@@ -638,6 +665,8 @@ func (rp *Reply) BytesArrayValue() ([][]byte, error) {
 	return result, nil
 }
 
+// BoolArrayValue indicates redis reply a multi value
+// each bulk is an integer(bool)
 func (rp *Reply) BoolArrayValue() ([]bool, error) {
 	if rp.Type == ErrorReply {
 		return nil, errors.New(rp.Error)
