@@ -1,5 +1,6 @@
 package goredis
 
+// SortCommand represents a redis Sort command
 type SortCommand struct {
 	redis  *Redis
 	key    string
@@ -13,19 +14,19 @@ type SortCommand struct {
 	store  string
 }
 
-// http://redis.io/commands/sort
+// Sort doc: http://redis.io/commands/sort
 // SORT key [BY pattern] [LIMIT offset count] [GET pattern [GET pattern ...]] [ASC|DESC] [ALPHA] [STORE destination]
 func (r *Redis) Sort(key string) *SortCommand {
 	return &SortCommand{redis: r, key: key}
 }
 
-// The BY option can also take a non-existent key, which causes SORT to skip the sorting operation.
+// By can also take a non-existent key, which causes SORT to skip the sorting operation.
 func (s *SortCommand) By(pattern string) *SortCommand {
 	s.by = pattern
 	return s
 }
 
-// This modifier takes the offset argument,
+// Limit takes the offset and count argument,
 // specifying the number of elements to skip and the count argument,
 // specifying the number of elements to return from starting at offset.
 func (s *SortCommand) Limit(offset, count int) *SortCommand {
@@ -35,31 +36,37 @@ func (s *SortCommand) Limit(offset, count int) *SortCommand {
 	return s
 }
 
+// Get sets sort GET arguments.
 func (s *SortCommand) Get(patterns ...string) *SortCommand {
 	s.get = patterns
 	return s
 }
 
+// ASC sets sort order to ASC.
 func (s *SortCommand) ASC() *SortCommand {
 	s.order = "ASC"
 	return s
 }
 
+// DESC sets sort order to DESC.
 func (s *SortCommand) DESC() *SortCommand {
 	s.order = "DESC"
 	return s
 }
 
+// Alpha sets ALPHA to sort command.
 func (s *SortCommand) Alpha(b bool) *SortCommand {
 	s.alpha = b
 	return s
 }
 
+// Store sets the sorted result store to.
 func (s *SortCommand) Store(destination string) *SortCommand {
 	s.store = destination
 	return s
 }
 
+// Run performs redis sort command.
 func (s *SortCommand) Run() (*Reply, error) {
 	args := packArgs("SORT", s.key)
 	if s.by != "" {

@@ -4,7 +4,7 @@ import (
 	"strconv"
 )
 
-// Add the specified members to the set stored at key.
+// SAdd add the specified members to the set stored at key.
 // Specified members that are already a member of this set are ignored.
 // If key does not exist, a new set is created before adding the specified members.
 // An error is returned when the value stored at key is not a set.
@@ -20,7 +20,7 @@ func (r *Redis) SAdd(key string, members ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the set cardinality (number of elements) of the set stored at key.
+// SCard returns the set cardinality (number of elements) of the set stored at key.
 func (r *Redis) SCard(key string) (int64, error) {
 	rp, err := r.ExecuteCommand("SCARD", key)
 	if err != nil {
@@ -29,7 +29,8 @@ func (r *Redis) SCard(key string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the members of the set resulting from the difference between the first set and all the successive sets.
+// SDiff returns the members of the set resulting from the difference
+// between the first set and all the successive sets.
 // Keys that do not exist are considered to be empty sets.
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SDiff(keys ...string) ([]string, error) {
@@ -41,7 +42,8 @@ func (r *Redis) SDiff(keys ...string) ([]string, error) {
 	return rp.ListValue()
 }
 
-// This command is equal to SDIFF, but instead of returning the resulting set, it is stored in destination.
+// SDiffStore is equal to SDIFF, but instead of returning the resulting set,
+// it is stored in destination.
 // If destination already exists, it is overwritten.
 // Integer reply: the number of elements in the resulting set.
 func (r *Redis) SDiffStore(destination string, keys ...string) (int64, error) {
@@ -53,7 +55,7 @@ func (r *Redis) SDiffStore(destination string, keys ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the members of the set resulting from the intersection of all the given sets.
+// SInter returns the members of the set resulting from the intersection of all the given sets.
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SInter(keys ...string) ([]string, error) {
 	args := packArgs("SINTER", keys)
@@ -64,7 +66,8 @@ func (r *Redis) SInter(keys ...string) ([]string, error) {
 	return rp.ListValue()
 }
 
-// This command is equal to SINTER, but instead of returning the resulting set, it is stored in destination.
+// SInterStore is equal to SINTER, but instead of returning the resulting set,
+// it is stored in destination.
 // If destination already exists, it is overwritten.
 // Integer reply: the number of elements in the resulting set.
 func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
@@ -76,7 +79,7 @@ func (r *Redis) SInterStore(destination string, keys ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns if member is a member of the set stored at key.
+// SIsMember returns if member is a member of the set stored at key.
 func (r *Redis) SIsMember(key, member string) (bool, error) {
 	rp, err := r.ExecuteCommand("SISMEMBER", key, member)
 	if err != nil {
@@ -85,7 +88,7 @@ func (r *Redis) SIsMember(key, member string) (bool, error) {
 	return rp.BoolValue()
 }
 
-// Returns all the members of the set value stored at key.
+// SMembers returns all the members of the set value stored at key.
 func (r *Redis) SMembers(key string) ([]string, error) {
 	rp, err := r.ExecuteCommand("SMEMBERS", key)
 	if err != nil {
@@ -94,7 +97,8 @@ func (r *Redis) SMembers(key string) ([]string, error) {
 	return rp.ListValue()
 }
 
-// Move member from the set at source to the set at destination. This operation is atomic.
+// SMove moves member from the set at source to the set at destination.
+// This operation is atomic.
 // In every given moment the element will appear to be a member of source or destination for other clients.
 func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	rp, err := r.ExecuteCommand("SMOVE", source, destination, member)
@@ -104,7 +108,7 @@ func (r *Redis) SMove(source, destination, member string) (bool, error) {
 	return rp.BoolValue()
 }
 
-// Removes and returns a random element from the set value stored at key.
+// SPop removes and returns a random element from the set value stored at key.
 // Bulk reply: the removed element, or nil when key does not exist.
 func (r *Redis) SPop(key string) ([]byte, error) {
 	rp, err := r.ExecuteCommand("SPOP", key)
@@ -114,8 +118,9 @@ func (r *Redis) SPop(key string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
-// When called with just the key argument, return a random element from the set value stored at key.
-// Bulk reply: the command returns a Bulk Reply with the randomly selected element, or nil when key does not exist.
+// SRandMember returns a random element from the set value stored at key.
+// Bulk reply: the command returns a Bulk Reply with the randomly selected element,
+// or nil when key does not exist.
 func (r *Redis) SRandMember(key string) ([]byte, error) {
 	rp, err := r.ExecuteCommand("SRANDMEMBER", key)
 	if err != nil {
@@ -124,8 +129,9 @@ func (r *Redis) SRandMember(key string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
-// return an array of count distinct elements if count is positive.
-// If called with a negative count the behavior changes and the command is allowed to return the same element multiple times.
+// SRandMemberCount returns an array of count distinct elements if count is positive.
+// If called with a negative count the behavior changes and the command
+// is allowed to return the same element multiple times.
 // In this case the numer of returned elements is the absolute value of the specified count.
 // returns an array of elements, or an empty array when key does not exist.
 func (r *Redis) SRandMemberCount(key string, count int) ([]string, error) {
@@ -136,11 +142,12 @@ func (r *Redis) SRandMemberCount(key string, count int) ([]string, error) {
 	return rp.ListValue()
 }
 
-// Remove the specified members from the set stored at key.
+// SRem remove the specified members from the set stored at key.
 // Specified members that are not a member of this set are ignored.
 // If key does not exist, it is treated as an empty set and this command returns 0.
 // An error is returned when the value stored at key is not a set.
-// Integer reply: the number of members that were removed from the set, not including non existing members.
+// Integer reply: the number of members that were removed from the set,
+// not including non existing members.
 func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	args := packArgs("SREM", key, members)
 	rp, err := r.ExecuteCommand(args...)
@@ -150,7 +157,7 @@ func (r *Redis) SRem(key string, members ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the members of the set resulting from the union of all the given sets.
+// SUnion returns the members of the set resulting from the union of all the given sets.
 // Multi-bulk reply: list with members of the resulting set.
 func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	args := packArgs("SUNION", keys)
@@ -161,6 +168,7 @@ func (r *Redis) SUnion(keys ...string) ([]string, error) {
 	return rp.ListValue()
 }
 
+// SUnionStore is equal to SUnion.
 // If destination already exists, it is overwritten.
 // Integer reply: the number of elements in the resulting set.
 func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
@@ -172,7 +180,7 @@ func (r *Redis) SUnionStore(destination string, keys ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// SSCAN key cursor [MATCH pattern] [COUNT count]
+// SScan key cursor [MATCH pattern] [COUNT count]
 func (r *Redis) SScan(key string, cursor uint64, pattern string, count int) (uint64, []string, error) {
 	args := packArgs("SSCAN", key, cursor)
 	if pattern != "" {

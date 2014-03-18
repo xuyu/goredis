@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// Adds all the specified members with the specified scores to the sorted set stored at key.
+// ZAdd adds all the specified members with the specified scores to the sorted set stored at key.
 // If a specified member is already a member of the sorted set,
 // the score is updated and the element reinserted at the right position to ensure the correct ordering.
 // If key does not exist, a new sorted set with the specified members as sole members is created,
@@ -27,7 +27,7 @@ func (r *Redis) ZAdd(key string, pairs map[string]float64) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
+// ZCard returns the sorted set cardinality (number of elements) of the sorted set stored at key.
 // Integer reply: the cardinality (number of elements) of the sorted set, or 0 if key does not exist.
 func (r *Redis) ZCard(key string) (int64, error) {
 	rp, err := r.ExecuteCommand("ZCARD", key)
@@ -37,7 +37,7 @@ func (r *Redis) ZCard(key string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the number of elements in the sorted set at key with a score between min and max.
+// ZCount returns the number of elements in the sorted set at key with a score between min and max.
 // The min and max arguments have the same semantic as described for ZRANGEBYSCORE.
 // Integer reply: the number of elements in the specified score range.
 func (r *Redis) ZCount(key, min, max string) (int64, error) {
@@ -48,7 +48,7 @@ func (r *Redis) ZCount(key, min, max string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Increments the score of member in the sorted set stored at key by increment.
+// ZIncrBy increments the score of member in the sorted set stored at key by increment.
 // If member does not exist in the sorted set, it is added with increment as its score
 // (as if its previous score was 0.0).
 // If key does not exist, a new sorted set with the specified member as its sole member is created.
@@ -70,7 +70,7 @@ func (r *Redis) ZIncrBy(key string, increment float64, member string) (float64, 
 	return score, nil
 }
 
-// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+// ZInterStore destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 func (r *Redis) ZInterStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
 	args := packArgs("ZINTERSTORE", destination, len(keys), keys)
 	if weights != nil && len(weights) > 0 {
@@ -89,7 +89,7 @@ func (r *Redis) ZInterStore(destination string, keys []string, weights []int, ag
 	return rp.IntegerValue()
 }
 
-// Returns the specified range of elements in the sorted set stored at key.
+// ZRange returns the specified range of elements in the sorted set stored at key.
 // The elements are considered to be ordered from the lowest to the highest score.
 // Lexicographical order is used for elements with equal score.
 // Multi-bulk reply: list of elements in the specified range.(optionally with their scores).
@@ -108,7 +108,7 @@ func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, 
 	return rp.ListValue()
 }
 
-// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+// ZRangeByScore key min max [WITHSCORES] [LIMIT offset count]
 func (r *Redis) ZRangeByScore(key, min, max string, withscores, limit bool, offset, count int) ([]string, error) {
 	args := packArgs("ZRANGEBYSCORE", key, min, max)
 	if withscores {
@@ -124,7 +124,8 @@ func (r *Redis) ZRangeByScore(key, min, max string, withscores, limit bool, offs
 	return rp.ListValue()
 }
 
-// Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
+// ZRank returns the rank of member in the sorted set stored at key,
+// with the scores ordered from low to high.
 // The rank (or index) is 0-based, which means that the member with the lowest score has rank 0.
 //
 // If member exists in the sorted set, Integer reply: the rank of member.
@@ -147,7 +148,7 @@ func (r *Redis) ZRank(key, member string) (int64, error) {
 	return -1, errors.New("ZRANK reply protocol error")
 }
 
-// Removes the specified members from the sorted set stored at key. Non existing members are ignored.
+// ZRem removes the specified members from the sorted set stored at key. Non existing members are ignored.
 // An error is returned when key exists and does not hold a sorted set.
 // Integer reply, specifically:
 // The number of members removed from the sorted set, not including non existing members.
@@ -160,7 +161,7 @@ func (r *Redis) ZRem(key string, members ...string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Removes all elements in the sorted set stored at key with rank between start and stop.
+// ZRemRangeByRank removes all elements in the sorted set stored at key with rank between start and stop.
 // Both start and stop are 0 -based indexes with 0 being the element with the lowest score.
 // These indexes can be negative numbers, where they indicate offsets starting at the element with the highest score.
 // For example: -1 is the element with the highest score, -2 the element with the second highest score and so forth.
@@ -173,7 +174,7 @@ func (r *Redis) ZRemRangeByRank(key string, start, stop int) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Removes all elements in the sorted set stored at key with a score between min and max (inclusive).
+// ZRemRangeByScore removes all elements in the sorted set stored at key with a score between min and max (inclusive).
 // Integer reply: the number of elements removed.
 func (r *Redis) ZRemRangeByScore(key, min, max string) (int64, error) {
 	rp, err := r.ExecuteCommand("ZREMRANGEBYSCORE", key, min, max)
@@ -183,7 +184,7 @@ func (r *Redis) ZRemRangeByScore(key, min, max string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Returns the specified range of elements in the sorted set stored at key.
+// ZRevRange returns the specified range of elements in the sorted set stored at key.
 // The elements are considered to be ordered from the highest to the lowest score.
 // Descending lexicographical order is used for elements with equal score.
 // Multi-bulk reply: list of elements in the specified range (optionally with their scores).
@@ -199,7 +200,7 @@ func (r *Redis) ZRevRange(key string, start, stop int, withscores bool) ([]strin
 	return rp.ListValue()
 }
 
-// ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
+// ZRevRangeByScore key max min [WITHSCORES] [LIMIT offset count]
 func (r *Redis) ZRevRangeByScore(key, max, min string, withscores, limit bool, offset, count int) ([]string, error) {
 	args := packArgs("ZREVRANGEBYSCORE", key, max, min)
 	if withscores {
@@ -215,7 +216,7 @@ func (r *Redis) ZRevRangeByScore(key, max, min string, withscores, limit bool, o
 	return rp.ListValue()
 }
 
-// Returns the rank of member in the sorted set stored at key,
+// ZRevRank returns the rank of member in the sorted set stored at key,
 // with the scores ordered from high to low. The rank (or index) is 0-based,
 // which means that the member with the highest score has rank 0.
 func (r *Redis) ZRevRank(key, member string) (int64, error) {
@@ -235,7 +236,7 @@ func (r *Redis) ZRevRank(key, member string) (int64, error) {
 	return -1, errors.New("ZREVRANK reply protocol error")
 }
 
-// Returns the score of member in the sorted set at key.
+// ZScore returns the score of member in the sorted set at key.
 // If member does not exist in the sorted set, or key does not exist, nil is returned.
 // Bulk reply: the score of member (a double precision floating point number), represented as string.
 func (r *Redis) ZScore(key, member string) ([]byte, error) {
@@ -246,7 +247,7 @@ func (r *Redis) ZScore(key, member string) ([]byte, error) {
 	return rp.BytesValue()
 }
 
-// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+// ZUnionStore destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 func (r *Redis) ZUnionStore(destination string, keys []string, weights []int, aggregate string) (int64, error) {
 	args := packArgs("ZUNIONSTORE", destination, len(keys), keys)
 	if weights != nil && len(weights) > 0 {
@@ -265,7 +266,7 @@ func (r *Redis) ZUnionStore(destination string, keys []string, weights []int, ag
 	return rp.IntegerValue()
 }
 
-// ZSCAN key cursor [MATCH pattern] [COUNT count]
+// ZScan key cursor [MATCH pattern] [COUNT count]
 func (r *Redis) ZScan(key string, cursor uint64, pattern string, count int) (uint64, []string, error) {
 	args := packArgs("ZSCAN", key, cursor)
 	if pattern != "" {

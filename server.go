@@ -7,14 +7,14 @@ import (
 	"strconv"
 )
 
-// Instruct Redis to start an Append Only File rewrite process.
+// BgRewriteAof Instruct Redis to start an Append Only File rewrite process.
 // The rewrite will create a small optimized version of the current Append Only File.
 func (r *Redis) BgRewriteAof() error {
 	_, err := r.ExecuteCommand("BGREWRITEAOF")
 	return err
 }
 
-// Save the DB in background.
+// BgSave save the DB in background.
 // The OK code is immediately returned.
 // Redis forks, the parent continues to serve the clients, the child saves the DB on disk then exits.
 // A client my be able to check if the operation succeeded using the LASTSAVE command.
@@ -23,7 +23,7 @@ func (r *Redis) BgSave() error {
 	return err
 }
 
-// The CLIENT KILL command closes a given client connection identified by ip:port.
+// ClientKill closes a given client connection identified by ip:port.
 // Due to the single-treaded nature of Redis,
 // it is not possible to kill a client connection while it is executing a command.
 // However, the client will notice the connection has been closed
@@ -37,7 +37,7 @@ func (r *Redis) ClientKill(ip string, port int) error {
 	return rp.OKValue()
 }
 
-// The CLIENT LIST command returns information and statistics
+// ClientList returns information and statistics
 // about the client connections server in a mostly human readable format.
 // Bulk reply: a unique string, formatted as follows:
 // One client connection per line (separated by LF)
@@ -50,7 +50,7 @@ func (r *Redis) ClientList() (string, error) {
 	return rp.StringValue()
 }
 
-// The CLIENT GETNAME returns the name of the current connection as set by CLIENT SETNAME.
+// ClientGetName returns the name of the current connection as set by CLIENT SETNAME.
 // Since every new connection starts without an associated name,
 // if no name was assigned a null bulk reply is returned.
 func (r *Redis) ClientGetName() ([]byte, error) {
@@ -61,7 +61,7 @@ func (r *Redis) ClientGetName() ([]byte, error) {
 	return rp.BytesValue()
 }
 
-// The CLIENT SETNAME command assigns a name to the current connection.
+// ClientSetName assigns a name to the current connection.
 func (r *Redis) ClientSetName(name string) error {
 	rp, err := r.ExecuteCommand("CLIENT", "SETNAME", name)
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *Redis) ClientSetName(name string) error {
 	return rp.OKValue()
 }
 
-// The CONFIG GET command is used to read the configuration parameters of a running Redis server.
+// ConfigGet is used to read the configuration parameters of a running Redis server.
 // Not all the configuration parameters are supported in Redis 2.4,
 // while Redis 2.6 can read the whole configuration of a server using this command.
 // CONFIG GET takes a single argument, which is a glob-style pattern.
@@ -82,7 +82,7 @@ func (r *Redis) ConfigGet(parameter string) (map[string]string, error) {
 	return rp.HashValue()
 }
 
-// The CONFIG REWRITE command rewrites the redis.conf file the server was started with,
+// ConfigRewrite rewrites the redis.conf file the server was started with,
 // applying the minimal changes needed to make it reflecting the configuration currently used by the server,
 // that may be different compared to the original one because of the use of the CONFIG SET command.
 // Available since 2.8.0.
@@ -94,7 +94,7 @@ func (r *Redis) ConfigRewrite() error {
 	return rp.OKValue()
 }
 
-// The CONFIG SET command is used in order to reconfigure the server at run time without the need to restart Redis.
+// ConfigSet is used in order to reconfigure the server at run time without the need to restart Redis.
 // You can change both trivial parameters or switch from one to another persistence option using this command.
 func (r *Redis) ConfigSet(parameter, value string) error {
 	rp, err := r.ExecuteCommand("CONFIG", "SET")
@@ -104,7 +104,7 @@ func (r *Redis) ConfigSet(parameter, value string) error {
 	return rp.OKValue()
 }
 
-// Resets the statistics reported by Redis using the INFO command.
+// ConfigResetStat resets the statistics reported by Redis using the INFO command.
 // These are the counters that are reset:
 // Keyspace hits
 // Keyspace misses
@@ -119,7 +119,7 @@ func (r *Redis) ConfigResetStat() error {
 	return err
 }
 
-// Return the number of keys in the currently-selected database.
+// DBSize return the number of keys in the currently-selected database.
 func (r *Redis) DBSize() (int64, error) {
 	rp, err := r.ExecuteCommand("DBSIZE")
 	if err != nil {
@@ -128,8 +128,7 @@ func (r *Redis) DBSize() (int64, error) {
 	return rp.IntegerValue()
 }
 
-// DEBUG OBJECT key
-// DEBUG OBJECT is a debugging command that should not be used by clients.
+// DebugObject is a debugging command that should not be used by clients.
 func (r *Redis) DebugObject(key string) (string, error) {
 	rp, err := r.ExecuteCommand("DEBUG", "OBJECT", key)
 	if err != nil {
@@ -138,7 +137,7 @@ func (r *Redis) DebugObject(key string) (string, error) {
 	return rp.StatusValue()
 }
 
-// Delete all the keys of all the existing databases,
+// FlushAll delete all the keys of all the existing databases,
 // not just the currently selected one.
 // This command never fails.
 func (r *Redis) FlushAll() error {
@@ -146,14 +145,14 @@ func (r *Redis) FlushAll() error {
 	return err
 }
 
-// Delete all the keys of the currently selected DB.
+// FlushDB delete all the keys of the currently selected DB.
 // This command never fails.
 func (r *Redis) FlushDB() error {
 	_, err := r.ExecuteCommand("FLUSHDB")
 	return err
 }
 
-// The INFO command returns information and statistics about the server
+// Info returns information and statistics about the server
 // in a format that is simple to parse by computers and easy to read by humans.
 // format document at http://redis.io/commands/info
 func (r *Redis) Info(section string) (string, error) {
@@ -165,7 +164,7 @@ func (r *Redis) Info(section string) (string, error) {
 	return rp.StringValue()
 }
 
-// Return the UNIX TIME of the last DB save executed with success.
+// LastSave return the UNIX TIME of the last DB save executed with success.
 // A client may check if a BGSAVE command succeeded reading the LASTSAVE value,
 // then issuing a BGSAVE command and checking at regular intervals every N seconds if LASTSAVE changed.
 // Integer reply: an UNIX time stamp.
@@ -177,12 +176,13 @@ func (r *Redis) LastSave() (int64, error) {
 	return rp.IntegerValue()
 }
 
-// MONITOR is a debugging command that streams back every command processed by the Redis server.
+// MonitorCommand is a debugging command that streams back every command processed by the Redis server.
 type MonitorCommand struct {
 	redis *Redis
 	conn  *connection
 }
 
+// Monitor sned MONITOR command to redis server.
 func (r *Redis) Monitor() (*MonitorCommand, error) {
 	c, err := r.pool.Get()
 	if err != nil {
@@ -201,6 +201,7 @@ func (r *Redis) Monitor() (*MonitorCommand, error) {
 	return &MonitorCommand{r, c}, nil
 }
 
+// Receive read from redis server and return the reply.
 func (m *MonitorCommand) Receive() (string, error) {
 	rp, err := m.conn.RecvReply()
 	if err != nil {
@@ -209,14 +210,14 @@ func (m *MonitorCommand) Receive() (string, error) {
 	return rp.StatusValue()
 }
 
+// Close closes current monitor command.
 func (m *MonitorCommand) Close() error {
 	return m.conn.SendCommand("QUIT")
 }
 
-// The SAVE commands performs a synchronous save of the dataset
+// Save performs a synchronous save of the dataset
 // producing a point in time snapshot of all the data inside the Redis instance,
 // in the form of an RDB file.
-//
 // You almost never want to call SAVE in production environments
 // where it will block all the other clients. Instead usually BGSAVE is used.
 func (r *Redis) Save() error {
@@ -227,7 +228,7 @@ func (r *Redis) Save() error {
 	return rp.OKValue()
 }
 
-// The command behavior is the following:
+// Shutdown behavior is the following:
 // Stop all the clients.
 // Perform a blocking SAVE if at least one save point is configured.
 // Flush the Append Only File if AOF is enabled.
@@ -249,7 +250,7 @@ func (r *Redis) Shutdown(save, noSave bool) error {
 	return errors.New(rp.Status)
 }
 
-// The SLAVEOF command can change the replication settings of a slave on the fly.
+// SlaveOf can change the replication settings of a slave on the fly.
 // If a Redis server is already acting as slave, the command SLAVEOF NO ONE will turn off the replication,
 // turning the Redis server into a MASTER.
 // In the proper form SLAVEOF hostname port will make the server a slave of
@@ -271,8 +272,7 @@ func (r *Redis) SlaveOf(host, port string) error {
 	return rp.OKValue()
 }
 
-// SLOWLOG subcommand [argument]
-// This command is used in order to read and reset the Redis slow queries log.
+// SlowLog is used in order to read and reset the Redis slow queries log.
 type SlowLog struct {
 	ID           int64
 	Timestamp    int64
@@ -280,6 +280,7 @@ type SlowLog struct {
 	Command      []string
 }
 
+// SlowLogGet returns slow logs.
 func (r *Redis) SlowLogGet(n int) ([]*SlowLog, error) {
 	rp, err := r.ExecuteCommand("SLOWLOG", "GET", n)
 	if err != nil {
@@ -317,7 +318,7 @@ func (r *Redis) SlowLogGet(n int) ([]*SlowLog, error) {
 	return slow, nil
 }
 
-// Obtaining the current length of the slow log
+// SlowLogLen Obtaining the current length of the slow log
 func (r *Redis) SlowLogLen() (int64, error) {
 	rp, err := r.ExecuteCommand("SLOWLOG", "LEN")
 	if err != nil {
@@ -326,7 +327,8 @@ func (r *Redis) SlowLogLen() (int64, error) {
 	return rp.IntegerValue()
 }
 
-// Resetting the slow log. Once deleted the information is lost forever.
+// SlowLogReset resetting the slow log.
+// Once deleted the information is lost forever.
 func (r *Redis) SlowLogReset() error {
 	rp, err := r.ExecuteCommand("SLOWLOG", "RESET")
 	if err != nil {
@@ -335,8 +337,8 @@ func (r *Redis) SlowLogReset() error {
 	return rp.OKValue()
 }
 
-// A multi bulk reply containing two elements:
-// unix time in seconds.
+// Time returns a multi bulk reply containing two elements:
+// unix time in seconds,
 // microseconds.
 func (r *Redis) Time() ([]string, error) {
 	rp, err := r.ExecuteCommand("TIME")
