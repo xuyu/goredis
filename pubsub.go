@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Posts a message to the given channel.
+// Publish posts a message to the given channel.
 // Integer reply: the number of clients that received the message.
 func (r *Redis) Publish(channel, message string) (int64, error) {
 	rp, err := r.ExecuteCommand("PUBLISH", channel, message)
@@ -16,7 +16,7 @@ func (r *Redis) Publish(channel, message string) (int64, error) {
 	return rp.IntegerValue()
 }
 
-// http://redis.io/topics/pubsub
+// PubSub doc: http://redis.io/topics/pubsub
 type PubSub struct {
 	redis *Redis
 	conn  *connection
@@ -25,6 +25,7 @@ type PubSub struct {
 	Channels map[string]bool
 }
 
+// PubSub new a PubSub from *redis.
 func (r *Redis) PubSub() (*PubSub, error) {
 	c, err := r.pool.Get()
 	if err != nil {
@@ -38,23 +39,21 @@ func (r *Redis) PubSub() (*PubSub, error) {
 	}, nil
 }
 
+// Close closes current pubsub command.
 func (p *PubSub) Close() error {
 	return p.conn.Conn.Close()
 }
 
-// Format of pushed messages
+// Receive returns the reply of pubsub command.
 // A message is a Multi-bulk reply with three elements.
 // The first element is the kind of message:
-//
-// subscribe: means that we successfully subscribed to the channel given as the second element in the reply.
+// 1) subscribe: means that we successfully subscribed to the channel given as the second element in the reply.
 // The third argument represents the number of channels we are currently subscribed to.
-//
-// unsubscribe: means that we successfully unsubscribed from the channel given as second element in the reply.
+// 2) unsubscribe: means that we successfully unsubscribed from the channel given as second element in the reply.
 // third argument represents the number of channels we are currently subscribed to.
 // When the last argument is zero, we are no longer subscribed to any channel,
 // and the client can issue any kind of Redis command as we are outside the Pub/Sub state.
-//
-// message: it is a message received as result of a PUBLISH command issued by another client.
+// 3) message: it is a message received as result of a PUBLISH command issued by another client.
 // The second element is the name of the originating channel, and the third argument is the actual message payload.
 func (p *PubSub) Receive() ([]string, error) {
 	rp, err := p.conn.RecvReply()
@@ -124,25 +123,25 @@ func (p *PubSub) Receive() ([]string, error) {
 	return nil, errors.New("pubsub protocol error")
 }
 
-// SUBSCRIBE channel [channel ...]
+// Subscribe channel [channel ...]
 func (p *PubSub) Subscribe(channels ...string) error {
 	args := packArgs("SUBSCRIBE", channels)
 	return p.conn.SendCommand(args...)
 }
 
-// PSUBSCRIBE pattern [pattern ...]
+// PSubscribe pattern [pattern ...]
 func (p *PubSub) PSubscribe(patterns ...string) error {
 	args := packArgs("PSUBSCRIBE", patterns)
 	return p.conn.SendCommand(args...)
 }
 
-// UNSUBSCRIBE [channel [channel ...]]
+// UnSubscribe [channel [channel ...]]
 func (p *PubSub) UnSubscribe(channels ...string) error {
 	args := packArgs("UNSUBSCRIBE", channels)
 	return p.conn.SendCommand(args...)
 }
 
-// PUNSUBSCRIBE [pattern [pattern ...]]
+// PUnSubscribe [pattern [pattern ...]]
 func (p *PubSub) PUnSubscribe(patterns ...string) error {
 	args := packArgs("PUNSUBSCRIBE", patterns)
 	return p.conn.SendCommand(args...)

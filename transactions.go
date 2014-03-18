@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-// Document: http://redis.io/topics/transactions
+// Transaction doc: http://redis.io/topics/transactions
 // MULTI, EXEC, DISCARD and WATCH are the foundation of transactions in Redis.
 // A Redis script is transactional by definition,
 // so everything you can do with a Redis transaction, you can also do with a script,
@@ -14,6 +14,7 @@ type Transaction struct {
 	conn  *connection
 }
 
+// Transaction new a *transaction from *redis
 func (r *Redis) Transaction() (*Transaction, error) {
 	c, err := r.pool.Get()
 	if err != nil {
@@ -30,11 +31,13 @@ func (r *Redis) Transaction() (*Transaction, error) {
 	return &Transaction{r, c}, nil
 }
 
+// Close closes the transaction, put the under connection back for reuse
 func (t *Transaction) Close() {
 	t.redis.pool.Put(t.conn)
 }
 
-// Flushes all previously queued commands in a transaction and restores the connection state to normal.
+// Discard flushes all previously queued commands in a transaction
+// and restores the connection state to normal.
 // If WATCH was used, DISCARD unwatches all keys.
 func (t *Transaction) Discard() error {
 	if err := t.conn.SendCommand("DISCARD"); err != nil {
@@ -44,7 +47,7 @@ func (t *Transaction) Discard() error {
 	return err
 }
 
-// Marks the given keys to be watched for conditional execution of a transaction.
+// Watch marks the given keys to be watched for conditional execution of a transaction.
 func (t *Transaction) Watch(keys ...string) error {
 	args := packArgs("WATCH", keys)
 	if err := t.conn.SendCommand(args...); err != nil {
@@ -54,7 +57,7 @@ func (t *Transaction) Watch(keys ...string) error {
 	return err
 }
 
-// Flushes all the previously watched keys for a transaction.
+// UnWatch flushes all the previously watched keys for a transaction.
 // If you call EXEC or DISCARD, there's no need to manually call UNWATCH.
 func (t *Transaction) UnWatch() error {
 	if err := t.conn.SendCommand("UNWATCH"); err != nil {
@@ -64,7 +67,8 @@ func (t *Transaction) UnWatch() error {
 	return err
 }
 
-// Executes all previously queued commands in a transaction and restores the connection state to normal.
+// Exec executes all previously queued commands in a transaction
+// and restores the connection state to normal.
 // When using WATCH, EXEC will execute commands only if the watched keys were not modified,
 // allowing for a check-and-set mechanism.
 func (t *Transaction) Exec() ([]*Reply, error) {
@@ -78,6 +82,8 @@ func (t *Transaction) Exec() ([]*Reply, error) {
 	return rp.MultiValue()
 }
 
+// Command send raw redis command to redis server
+// and redis will return QUEUED back
 func (t *Transaction) Command(args ...interface{}) error {
 	args2 := packArgs(args...)
 	if err := t.conn.SendCommand(args2...); err != nil {
