@@ -12,6 +12,7 @@ redis client in golang
 - Pure golang, and no other three-party libraris dependent;
 - Hight test coverage and will continue to raise;
 - Tested under Go1.2 and Redis2.8.3;
+- Tested under Go1.2.1 and Redis2.8.4;
 
 
 Features
