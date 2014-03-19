@@ -9,10 +9,10 @@ redis client in golang
 
 [Redis](http://redis.io) is an open source, BSD licensed, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
 
-- Pure golang, and no other three-party libraris dependent;
-- Hight test coverage and will continue to raise;
-- Tested under Go1.2 and Redis2.8.3;
-- Tested under Go1.2.1 and Redis2.8.4;
+- Pure golang, and doesn't depend on any 3rd party libraries;
+- Hight test coverage and will continue to improve;
+- Tested under Go 1.2 and Redis 2.8.3;
+- Tested under Go 1.2.1 and Redis 2.8.4;
 
 
 Features
