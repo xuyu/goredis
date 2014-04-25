@@ -61,6 +61,15 @@ func (r *Redis) ClientGetName() ([]byte, error) {
 	return rp.BytesValue()
 }
 
+// ClientPause stops the server processing commands from clients for some time.
+func (r *Redis) ClientPause(timeout uint64) error {
+	rp, err := r.ExecuteCommand("CLIENT", "PAUSE", timeout)
+	if err != nil {
+		return err
+	}
+	return rp.OKValue()
+}
+
 // ClientSetName assigns a name to the current connection.
 func (r *Redis) ClientSetName(name string) error {
 	rp, err := r.ExecuteCommand("CLIENT", "SETNAME", name)

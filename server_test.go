@@ -36,6 +36,12 @@ func TestClientGetName(t *testing.T) {
 	}
 }
 
+func TestClientPause(t *testing.T) {
+	if err := r.ClientPause(100); err != nil {
+		t.Error(err.Error())
+	}
+}
+
 func TestClientSetName(t *testing.T) {
 	if err := r.ClientSetName("name"); err != nil {
 		t.Error(err)
