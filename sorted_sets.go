@@ -89,6 +89,16 @@ func (r *Redis) ZInterStore(destination string, keys []string, weights []int, ag
 	return rp.IntegerValue()
 }
 
+// ZLexCount returns the number of elements in the sorted set at key
+// with a value between min and max in order to force lexicographical ordering.
+func (r *Redis) ZLexCount(key, min, max string) (int64, error) {
+	rp, err := r.ExecuteCommand("ZLEXCOUNT", key, min, max)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
+
 // ZRange returns the specified range of elements in the sorted set stored at key.
 // The elements are considered to be ordered from the lowest to the highest score.
 // Lexicographical order is used for elements with equal score.
@@ -100,6 +110,20 @@ func (r *Redis) ZRange(key string, start, stop int, withscores bool) ([]string, 
 	args := []interface{}{"ZRANGE", key, start, stop}
 	if withscores {
 		args = append(args, "WITHSCORES")
+	}
+	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	return rp.ListValue()
+}
+
+// ZRangeByLex returns all the elements in the sorted set at key with a value between min and max
+// in order to force lexicographical ordering.
+func (r *Redis) ZRangeByLex(key, min, max string, limit bool, offset, count int) ([]string, error) {
+	args := packArgs("ZRANGEBYLEX", key, min, max)
+	if limit {
+		args = append(args, "LIMIT", offset, count)
 	}
 	rp, err := r.ExecuteCommand(args...)
 	if err != nil {
@@ -155,6 +179,16 @@ func (r *Redis) ZRank(key, member string) (int64, error) {
 func (r *Redis) ZRem(key string, members ...string) (int64, error) {
 	args := packArgs("ZREM", key, members)
 	rp, err := r.ExecuteCommand(args...)
+	if err != nil {
+		return 0, err
+	}
+	return rp.IntegerValue()
+}
+
+// ZRemRangeByLex removes all elements in the sorted set stored at key
+// between the lexicographical range specified by min and max.
+func (r *Redis) ZRemRangeByLex(key, min, max string) (int64, error) {
+	rp, err := r.ExecuteCommand("ZREMRANGEBYLEX", key, min, max)
 	if err != nil {
 		return 0, err
 	}
