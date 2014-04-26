@@ -8,7 +8,7 @@ import (
 
 var (
 	network  = "tcp"
-	address  = "192.168.84.250:6379"
+	address  = "127.0.0.1:6379"
 	db       = 1
 	password = ""
 	timeout  = 5 * time.Second
