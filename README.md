@@ -50,7 +50,7 @@ Try a redis command is simple too, let's do GET/SET:
 	err := client.Set("key", "value", 0, 0, false, false)
 	value, err := client.Get("key")
 
-Or you can execute customer command with Redis.ExecuteCommand method:
+Or you can execute a custom command with Redis.ExecuteCommand method:
 
 	reply, err := client.ExecuteCommand("SET", "key", "value")
 	err := reply.OKValue()
