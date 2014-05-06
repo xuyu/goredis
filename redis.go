@@ -80,12 +80,9 @@ package goredis
 
 import (
 	"bufio"
-	"bytes"
 	"container/list"
 	"errors"
-	"fmt"
 	"io"
-	"math"
 	"net"
 	"net/url"
 	"reflect"
@@ -94,34 +91,6 @@ import (
 	"sync"
 	"time"
 )
-
-type bufferPool struct {
-	bufs  []*bytes.Buffer
-	mutex sync.Mutex
-}
-
-func (b *bufferPool) GetBuffer() *bytes.Buffer {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	if len(b.bufs) > 0 {
-		buf := b.bufs[0]
-		b.bufs[0] = nil
-		b.bufs = b.bufs[1:]
-		return buf
-	}
-	return bytes.NewBuffer(nil)
-}
-
-func (b *bufferPool) PutBuffer(buf *bytes.Buffer) {
-	b.mutex.Lock()
-	if len(b.bufs) < math.MaxInt16 {
-		buf.Reset()
-		b.bufs = append(b.bufs, buf)
-	}
-	b.mutex.Unlock()
-}
-
-var buffers = &bufferPool{}
 
 func packArgs(items ...interface{}) (args []interface{}) {
 	for _, item := range items {
@@ -153,12 +122,9 @@ func packArgs(items ...interface{}) (args []interface{}) {
 }
 
 func packCommand(args ...interface{}) ([]byte, error) {
-	buf := buffers.GetBuffer()
-	defer buffers.PutBuffer(buf)
-	if _, err := fmt.Fprintf(buf, "*%d\r\n", len(args)); err != nil {
-		return nil, err
-	}
-	var s string
+	var s, ret string
+	ret = "*" + strconv.Itoa(len(args)) + "\r\n"
+
 	for _, arg := range args {
 		switch v := arg.(type) {
 		case string:
@@ -174,11 +140,9 @@ func packCommand(args ...interface{}) ([]byte, error) {
 		default:
 			return nil, errors.New("invalid argument type when pack command")
 		}
-		if _, err := fmt.Fprintf(buf, "$%d\r\n%s\r\n", len(s), s); err != nil {
-			return nil, err
-		}
+		ret += "$" + strconv.Itoa(len(s)) + "\r\n" + s + "\r\n"
 	}
-	return buf.Bytes(), nil
+	return []byte(ret), nil
 }
 
 type connection struct {
