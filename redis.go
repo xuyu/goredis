@@ -80,12 +80,9 @@ package goredis
 
 import (
 	"bufio"
-	"bytes"
 	"container/list"
 	"errors"
-	"fmt"
 	"io"
-	"math"
 	"net"
 	"net/url"
 	"reflect"
@@ -94,34 +91,6 @@ import (
 	"sync"
 	"time"
 )
-
-type bufferPool struct {
-	bufs  []*bytes.Buffer
-	mutex sync.Mutex
-}
-
-func (b *bufferPool) GetBuffer() *bytes.Buffer {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	if len(b.bufs) > 0 {
-		buf := b.bufs[0]
-		b.bufs[0] = nil
-		b.bufs = b.bufs[1:]
-		return buf
-	}
-	return bytes.NewBuffer(nil)
-}
-
-func (b *bufferPool) PutBuffer(buf *bytes.Buffer) {
-	b.mutex.Lock()
-	if len(b.bufs) < math.MaxInt16 {
-		buf.Reset()
-		b.bufs = append(b.bufs, buf)
-	}
-	b.mutex.Unlock()
-}
-
-var buffers = &bufferPool{}
 
 func packArgs(items ...interface{}) (args []interface{}) {
 	for _, item := range items {
@@ -152,33 +121,60 @@ func packArgs(items ...interface{}) (args []interface{}) {
 	return args
 }
 
-func packCommand(args ...interface{}) ([]byte, error) {
-	buf := buffers.GetBuffer()
-	defer buffers.PutBuffer(buf)
-	if _, err := fmt.Fprintf(buf, "*%d\r\n", len(args)); err != nil {
-		return nil, err
+func numLen(i int64) int64 {
+	n, pos10 := int64(1), int64(10)
+	if i < 0 {
+		i = -i
+		n++
 	}
-	var s string
+	for i >= pos10 {
+		n++
+		pos10 *= 10
+	}
+	return n
+}
+
+func packCommand(args ...interface{}) ([]byte, error) {
+	n := len(args)
+	res := make([]byte, 0, 16*n)
+	res = append(res, byte('*'))
+	res = strconv.AppendInt(res, int64(n), 10)
+	res = append(res, byte('\r'), byte('\n'))
 	for _, arg := range args {
+		res = append(res, byte('$'))
 		switch v := arg.(type) {
+		case []byte:
+			res = strconv.AppendInt(res, int64(len(v)), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = append(res, v...)
 		case string:
-			s = v
+			res = strconv.AppendInt(res, int64(len(v)), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = append(res, []byte(v)...)
 		case int:
-			s = strconv.Itoa(v)
+			res = strconv.AppendInt(res, numLen(int64(v)), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = strconv.AppendInt(res, int64(v), 10)
 		case int64:
-			s = strconv.FormatInt(v, 10)
+			res = strconv.AppendInt(res, numLen(v), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = strconv.AppendInt(res, int64(v), 10)
 		case uint64:
-			s = strconv.FormatUint(v, 10)
+			res = strconv.AppendInt(res, numLen(int64(v)), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = strconv.AppendUint(res, uint64(v), 10)
 		case float64:
-			s = strconv.FormatFloat(v, 'g', -1, 64)
+			var buf []byte
+			buf = strconv.AppendFloat(buf, v, 'g', -1, 64)
+			res = strconv.AppendInt(res, int64(len(buf)), 10)
+			res = append(res, byte('\r'), byte('\n'))
+			res = append(res, buf...)
 		default:
 			return nil, errors.New("invalid argument type when pack command")
 		}
-		if _, err := fmt.Fprintf(buf, "$%d\r\n%s\r\n", len(s), s); err != nil {
-			return nil, err
-		}
+		res = append(res, byte('\r'), byte('\n'))
 	}
-	return buf.Bytes(), nil
+	return res, nil
 }
 
 type connection struct {
