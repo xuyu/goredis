@@ -306,11 +306,11 @@ func (p *connPool) Put(c *connection) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	p.active--
-	if p.closed {
-		c.Conn.Close()
+	if c == nil {
 		return
 	}
-	if c == nil {
+	if p.closed {
+		c.Conn.Close()
 		return
 	}
 	if p.idle.Len() >= p.MaxIdle {
