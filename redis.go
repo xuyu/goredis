@@ -289,6 +289,7 @@ func (p *connPool) Get() (*connection, error) {
 	p.mutex.Lock()
 	p.active++
 	if p.closed {
+		p.mutex.Unlock()
 		return nil, errors.New("connection pool closed")
 	}
 	if p.idle.Len() > 0 {
