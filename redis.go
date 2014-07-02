@@ -271,23 +271,21 @@ type connPool struct {
 	Dial    func() (*connection, error)
 
 	idle   *list.List
-	active int
 	closed bool
 	mutex  sync.Mutex
 }
 
 func (p *connPool) Close() {
 	p.mutex.Lock()
-	defer p.mutex.Unlock()
 	p.closed = true
 	for e := p.idle.Front(); e != nil; e = e.Next() {
 		e.Value.(*connection).Conn.Close()
 	}
+	p.mutex.Unlock()
 }
 
 func (p *connPool) Get() (*connection, error) {
 	p.mutex.Lock()
-	p.active++
 	if p.closed {
 		p.mutex.Unlock()
 		return nil, errors.New("connection pool closed")
@@ -304,19 +302,20 @@ func (p *connPool) Get() (*connection, error) {
 
 func (p *connPool) Put(c *connection) {
 	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	p.active--
 	if c == nil {
+		p.mutex.Unlock()
 		return
 	}
 	if p.closed {
 		c.Conn.Close()
+		p.mutex.Unlock()
 		return
 	}
 	if p.idle.Len() >= p.MaxIdle {
 		p.idle.Remove(p.idle.Front())
 	}
 	p.idle.PushBack(c)
+	p.mutex.Unlock()
 }
 
 // Redis client struct
@@ -333,10 +332,10 @@ type Redis struct {
 // ExecuteCommand send any raw redis command and receive reply from redis server
 func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 	c, err := r.pool.Get()
-	defer r.pool.Put(c)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { r.pool.Put(c) }()
 	if err := c.SendCommand(args...); err != nil {
 		if err != io.EOF {
 			return nil, err
