@@ -2,6 +2,7 @@ package goredis
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 )
@@ -78,13 +79,25 @@ func (r *Redis) SentinelSetPass(podname string, password string) error {
 	return err
 }
 
-// SentinelMasterInfo returns the information about a pod or master
-func (r *Redis) SentinelMasterInfo(podname string) (master MasterInfo, err error) {
-	rp, err := r.ExecuteCommand("SENTINEL", "MASTER", podname)
+func (r *Redis) SentinelMasters() (masters []MasterInfo, err error) {
+	rp, err := r.ExecuteCommand("SENTINEL", "MASTERS")
 	if err != nil {
-		return master, err
+		return
 	}
-	info, err := rp.HashValue()
+	podcount := len(rp.Multi)
+	println("Found", podcount, "Pods")
+	for i := 0; i < podcount; i++ {
+		pod, err := rp.Multi[i].HashValue()
+		if err != nil {
+			log.Fatal("Error:", err)
+		}
+		minfo, err := buildMasterInfoStruct(pod)
+		masters = append(masters, minfo)
+	}
+	return
+}
+
+func buildMasterInfoStruct(info map[string]string) (master MasterInfo, err error) {
 	s := reflect.ValueOf(&master).Elem()
 	typeOfT := s.Type()
 	for i := 0; i < s.NumField(); i++ {
@@ -119,6 +132,16 @@ func (r *Redis) SentinelMasterInfo(podname string) (master MasterInfo, err error
 		}
 	}
 	return
+}
+
+// SentinelMasterInfo returns the information about a pod or master
+func (r *Redis) SentinelMasterInfo(podname string) (master MasterInfo, err error) {
+	rp, err := r.ExecuteCommand("SENTINEL", "MASTER", podname)
+	if err != nil {
+		return master, err
+	}
+	info, err := rp.HashValue()
+	return buildMasterInfoStruct(info)
 }
 
 // SentinelGetMaster returns the information needed to connect to the master of
