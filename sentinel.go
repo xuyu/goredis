@@ -50,19 +50,125 @@ type MasterInfo struct {
 	Quorum                int    `redis:"quorum"`
 	NumOtherSentinels     int    `redis:"num-other-sentinels"`
 	ParallelSyncs         int    `redis:"parallel-syncs"`
-	RoleReported          string `redis:"role-reported"`
 	Runid                 string `redis:"runid"`
 	IP                    string `redis:"ip"`
 	DownAfterMilliseconds int    `redis:"down-after-milliseconds"`
 	IsMasterDown          bool   `redis:"is-master-down"`
 	LastOkPingReply       int    `redis:"last-ok-ping-reply"`
+	RoleReportedTime      int    `redis:"role-reported-time"`
+	InfoRefresh           int    `redis:"info-refresh"`
+	RoleReported          string `redis:"role-reported"`
+	LastPingReply         int    `redis:"last-ping-reply"`
 	LastPingSent          int    `redis:"last-ping-sent"`
 	FailoverTimeout       int    `redis:"failover-timeout"`
 	ConfigEpoch           int    `redis:"config-epoch"`
-	RoleReportedTime      int    `redis:"role-reported-time"`
-	LastPingReply         int    `redis:"last-ping-reply"`
-	InfoRefresh           int    `redis:"info-refresh"`
 	Flags                 string `redis:"flags"`
+}
+
+// SlaveInfo is a struct for the results returned from slave queries,
+// specifically the individual entries of the  `sentinel slave <podname>`
+// command. As with the other Sentinel structs this may change and will need
+// updated for new entries
+// Currently the members defined by sentinel are as follows.
+// "name"
+// "ip"
+// "port"
+// "runid"
+// "flags"
+// "pending-commands"
+// "last-ping-sent"
+// "last-ok-ping-reply"
+// "last-ping-reply"
+// "down-after-milliseconds"
+// "info-refresh"
+// "role-reported"
+// "role-reported-time"
+// "master-link-down-time"
+// "master-link-status"
+// "master-host"
+// "master-port"
+// "slave-priority"
+// "slave-repl-offset"
+type SlaveInfo struct {
+	Name                   string `redis:"name"`
+	Host                   string `redis:"ip"`
+	Port                   int    `redis:"port"`
+	Runid                  string `redis:"runid"`
+	Flags                  string `redis:"flags"`
+	PendingCommands        int    `redis:"pending-commands"`
+	IsMasterDown           bool   `redis:"is-master-down"`
+	LastOkPingReply        int    `redis:"last-ok-ping-reply"`
+	RoleReportedTime       int    `redis:"role-reported-time"`
+	LastPingReply          int    `redis:"last-ping-reply"`
+	LastPingSent           int    `redis:"last-ping-sent"`
+	InfoRefresh            int    `redis:"info-refresh"`
+	RoleReported           string `redis:"role-reported"`
+	MasterLinkDownTime     int    `redis:"master-link-down-time"`
+	MasterLinkStatus       string `redis:"master-link-status"`
+	MasterHost             string `redis:"master-host"`
+	MasterPort             int    `redis:"master-port"`
+	SlavePriority          int    `redis:"slave-priority"`
+	SlaveReplicationOffset int    `redis:"slave-repl-offset"`
+}
+
+// buildSlaveInfoStruct builods the struct for a slave from the Redis slaves command
+func buildSlaveInfoStruct(info map[string]string) (master SlaveInfo, err error) {
+	s := reflect.ValueOf(&master).Elem()
+	typeOfT := s.Type()
+	for i := 0; i < s.NumField(); i++ {
+		p := typeOfT.Field(i)
+		f := s.Field(i)
+		tag := p.Tag.Get("redis")
+		if f.Type().Name() == "int" {
+			val, err := strconv.ParseInt(info[tag], 10, 64)
+			if err != nil {
+				println("Unable to convert to data from sentinel server:", info[tag])
+			} else {
+				f.SetInt(val)
+			}
+		}
+		if f.Type().Name() == "string" {
+			f.SetString(info[tag])
+		}
+		if f.Type().Name() == "bool" {
+			// This handles primarily the xxx_xx style fields in the return data from redis
+			if info[tag] != "" {
+				val, err := strconv.ParseInt(info[tag], 10, 64)
+				if err != nil {
+					println("Unable to convert to data from sentinel server:", info[tag])
+					fmt.Println("Error:", err)
+				} else {
+					if val > 0 {
+						f.SetBool(true)
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
+// SentinelSlaves takes a podname and returns a list of SlaveInfo structs for
+// each known slave.
+func (r *Redis) SentinelSlaves(podname string) (slaves []SlaveInfo) {
+	rp, err := r.ExecuteCommand("SENTINEL", "SLAVES", podname)
+	if err != nil {
+		fmt.Println("error on slaves command:", err)
+		return
+	}
+	for i := 0; i < len(rp.Multi); i++ {
+		slavemap, err := rp.Multi[i].HashValue()
+		if err != nil {
+			log.Println("unable to get slave info, err:", err)
+		} else {
+			info, err := buildSlaveInfoStruct(slavemap)
+			if err != nil {
+				fmt.Printf("Unable to get slaves, err:", err, "\n")
+			}
+			slaves = append(slaves, info)
+		}
+	}
+	return
 }
 
 // SentinelMonitor executes the SENTINEL MONITOR command on the server
