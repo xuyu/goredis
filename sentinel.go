@@ -178,7 +178,28 @@ func (r *Redis) SentinelMonitor(podname string, ip string, port int, quorum int)
 	return err
 }
 
-// SentinelMonitor will set the value to be used in the AUTH command for a
+// SentinelRemove executes the SENTINEL REMOVE command on the server
+// This is used to remove pods to the sentinel configuration
+func (r *Redis) SentinelRemove(podname string) error {
+	_, err := r.ExecuteCommand("SENTINEL", "REMOVE", podname)
+	return err
+}
+
+// SentinelSetString will set the value of skey to sval for a
+// given pod. This is used when the value is known to be a string
+func (r *Redis) SentinelSetString(podname string, skey string, sval string) error {
+	_, err := r.ExecuteCommand("SENTINEL", "SET", podname, skey, sval)
+	return err
+}
+
+// SentinelSetInt will set the value of skey to sval for a
+// given pod. This is used when the value is known to be an Int
+func (r *Redis) SentinelSetInt(podname string, skey string, sval int) error {
+	_, err := r.ExecuteCommand("SENTINEL", "SET", podname, skey, sval)
+	return err
+}
+
+// SentinelSetPass will set the value to be used in the AUTH command for a
 // given pod
 func (r *Redis) SentinelSetPass(podname string, password string) error {
 	_, err := r.ExecuteCommand("SENTINEL", "SET", podname, "AUTHPASS", password)
@@ -191,7 +212,6 @@ func (r *Redis) SentinelMasters() (masters []MasterInfo, err error) {
 		return
 	}
 	podcount := len(rp.Multi)
-	println("Found", podcount, "Pods")
 	for i := 0; i < podcount; i++ {
 		pod, err := rp.Multi[i].HashValue()
 		if err != nil {
@@ -264,4 +284,18 @@ func (r *Redis) SentinelGetMaster(podname string) (conninfo MasterAddress, err e
 		fmt.Println("Got bad port info from server, causing err:", err)
 	}
 	return conninfo, err
+}
+
+func (r *Redis) SentinelFailover(podname string) (bool, error) {
+	rp, err := r.ExecuteCommand("SENTINEL", "failover", podname)
+	if err != nil {
+		log.Println("Error on failover command execution:", err)
+		return false, err
+	}
+
+	if rp.Error != "" {
+		log.Println("Error on failover command execution:", rp.Error)
+		return false, fmt.Errorf("Unable to failover pod '%s' due to error: '%s'", podname, rp.Error)
+	}
+	return true, nil
 }
