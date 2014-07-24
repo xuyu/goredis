@@ -14,7 +14,7 @@ connected to.
 ## SentinelSlaves
 
 ### What It Does
-This command takes a string argument specifying a podname (aka. a
+This method takes a string argument specifying a podname (aka. a
 master) to get a list of slaves for. It will return a SlaveInfo struct
 for each slave in the pod.
 
@@ -37,7 +37,7 @@ crude load balancing.
 
 ### What It Does
 
-This command provides a list of masters currently managed by the
+This method provides a list of masters currently managed by the
 Sentinel instance, with detailed information about them. 
 
 ### WHy You Use It
@@ -61,7 +61,7 @@ alerting to conditions which prevent failover.
 
 ### What It Does
 
-This command returns a IP:PORT connection string for the current master of the
+This method returns a IP:PORT connection string for the current master of the
 given pod name.
 
 ### Why You Use It
@@ -76,7 +76,7 @@ in admin displays or tools.
 
 ### What It Does
 
-This command is used to *request* a given pod be failed over. .
+This method is used to *request* a given pod be failed over. .
 
 ### Why You Use It
 
@@ -93,7 +93,7 @@ merely that it was initiation, nor the slave which was promoted
 
 ### What It Does
 
-This command adds a new master/pod to the Sentinel instance for
+This method adds a new master/pod to the Sentinel instance for
 management.
 
 ### Why You Use It
@@ -106,7 +106,7 @@ return an error.
 
 ### What It Does
 
-This command is the counterpart to SentinelMonitor. It removes masters
+This method is the counterpart to SentinelMonitor. It removes masters
 from the Sentinel.
 
 ### Why You Use It
@@ -117,7 +117,7 @@ When you no longer need to monitor the given pod/master.
 
 ### What It Does
 
-This command sets or changes the authpassword for a given pod/master.
+This method sets or changes the authpassword for a given pod/master.
 
 ### Why You Use It
 
@@ -130,7 +130,7 @@ to connect to the master (and slaves).
 
 ### What It Does
 
-This command sets a given Sentinel configuration variable for a specific
+This method sets a given Sentinel configuration variable for a specific
 pod/master when the value being set is a string.
 
 ### Why You Use It
@@ -142,7 +142,7 @@ unavailability. You would use this command to set those settings.
 
 ### What It Does
 
-This command sets a given Sentinel configuration variable for a specific
+This method sets a given Sentinel configuration variable for a specific
 pod/master when the value being set is an integer.
 
 ### Why You Use It
@@ -154,3 +154,26 @@ given pod failed over in the event it is down for three seconds or 30
 seconds.
 
 
+# Exported Structures
+
+## MasterAddress
+
+This struct defines the addressing pair for a Sentinel Master. It is
+used by the SentinelGetMaster method.
+
+## MasterInfo
+
+This struct contains all of the information Redis returns when asked
+about master details such as via the SentinelMasters or SentinelMaster
+methods.
+
+The tags on struct members are used to identify and map the results from
+Sentinel (which include names with dashes in them) to the struct.
+
+## SlaveInfo
+
+This struct contains all of the information Redis returns when asked
+about slave details such as via the SentinelSlaves methods.
+
+The tags on struct members are used to identify and map the results from
+Sentinel (which include names with dashes in them) to the struct.
