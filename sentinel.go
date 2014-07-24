@@ -112,7 +112,7 @@ type SlaveInfo struct {
 }
 
 // buildSlaveInfoStruct builods the struct for a slave from the Redis slaves command
-func buildSlaveInfoStruct(info map[string]string) (master SlaveInfo, err error) {
+func (r *Redis) buildSlaveInfoStruct(info map[string]string) (master SlaveInfo, err error) {
 	s := reflect.ValueOf(&master).Elem()
 	typeOfT := s.Type()
 	for i := 0; i < s.NumField(); i++ {
@@ -122,7 +122,7 @@ func buildSlaveInfoStruct(info map[string]string) (master SlaveInfo, err error) 
 		if f.Type().Name() == "int" {
 			val, err := strconv.ParseInt(info[tag], 10, 64)
 			if err != nil {
-				println("Unable to convert to data from sentinel server:", info[tag])
+				println("Unable to convert to data from sentinel server:", info[tag], err)
 			} else {
 				f.SetInt(val)
 			}
@@ -135,7 +135,7 @@ func buildSlaveInfoStruct(info map[string]string) (master SlaveInfo, err error) 
 			if info[tag] != "" {
 				val, err := strconv.ParseInt(info[tag], 10, 64)
 				if err != nil {
-					println("Unable to convert to data from sentinel server:", info[tag])
+					println("[bool] Unable to convert to data from sentinel server:", info[tag], err)
 					fmt.Println("Error:", err)
 				} else {
 					if val > 0 {
@@ -161,7 +161,7 @@ func (r *Redis) SentinelSlaves(podname string) (slaves []SlaveInfo) {
 		if err != nil {
 			log.Println("unable to get slave info, err:", err)
 		} else {
-			info, err := buildSlaveInfoStruct(slavemap)
+			info, err := r.buildSlaveInfoStruct(slavemap)
 			if err != nil {
 				fmt.Printf("Unable to get slaves, err:", err, "\n")
 			}
@@ -217,13 +217,13 @@ func (r *Redis) SentinelMasters() (masters []MasterInfo, err error) {
 		if err != nil {
 			log.Fatal("Error:", err)
 		}
-		minfo, err := buildMasterInfoStruct(pod)
+		minfo, err := r.buildMasterInfoStruct(pod)
 		masters = append(masters, minfo)
 	}
 	return
 }
 
-func buildMasterInfoStruct(info map[string]string) (master MasterInfo, err error) {
+func (r *Redis) buildMasterInfoStruct(info map[string]string) (master MasterInfo, err error) {
 	s := reflect.ValueOf(&master).Elem()
 	typeOfT := s.Type()
 	for i := 0; i < s.NumField(); i++ {
@@ -233,7 +233,7 @@ func buildMasterInfoStruct(info map[string]string) (master MasterInfo, err error
 		if f.Type().Name() == "int" {
 			val, err := strconv.ParseInt(info[tag], 10, 64)
 			if err != nil {
-				println("Unable to convert to data from sentinel server:", info[tag])
+				fmt.Println("Unable to convert to integer from sentinel server:", tag, info[tag], err)
 			} else {
 				f.SetInt(val)
 			}
@@ -244,10 +244,10 @@ func buildMasterInfoStruct(info map[string]string) (master MasterInfo, err error
 		if f.Type().Name() == "bool" {
 			// This handles primarily the xxx_xx style fields in the return data from redis
 			if info[tag] != "" {
-				println(tag, ":=", info[tag])
 				val, err := strconv.ParseInt(info[tag], 10, 64)
 				if err != nil {
-					println("Unable to convert to data from sentinel server:", info[tag])
+					println("Unable to convert to bool from sentinel server:", info[tag])
+					fmt.Println(info[tag])
 					fmt.Println("Error:", err)
 				} else {
 					if val > 0 {
@@ -267,7 +267,7 @@ func (r *Redis) SentinelMasterInfo(podname string) (master MasterInfo, err error
 		return master, err
 	}
 	info, err := rp.HashValue()
-	return buildMasterInfoStruct(info)
+	return r.buildMasterInfoStruct(info)
 }
 
 // SentinelGetMaster returns the information needed to connect to the master of
