@@ -225,6 +225,11 @@ func (r *Redis) Set(key, value string, seconds, milliseconds int, mustExists, mu
 	return rp.OKValue()
 }
 
+// SimpleSet do SET key value, no other arguments.
+func (r *Redis) SimpleSet(key, value string) error {
+	return r.Set(key, value, 0, 0, false, false)
+}
+
 // SetBit sets or clears the bit at offset in the string value stored at key.
 // Integer reply: the original bit value stored at offset.
 func (r *Redis) SetBit(key string, offset, value int) (int64, error) {
