@@ -110,10 +110,6 @@ func packArgs(items ...interface{}) (args []interface{}) {
 			for _, key := range v.MapKeys() {
 				args = append(args, key.Interface(), v.MapIndex(key).Interface())
 			}
-		case reflect.String:
-			if v.String() != "" {
-				args = append(args, v.Interface())
-			}
 		default:
 			args = append(args, v.Interface())
 		}

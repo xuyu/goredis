@@ -249,6 +249,12 @@ func TestSet(t *testing.T) {
 	}
 }
 
+func TestSetEmptyValue(t *testing.T) {
+	if err := r.Set("key", "", 0, 0, false, false); err != nil {
+		t.Error(err)
+	}
+}
+
 func BenchmarkSet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r.Set("key", "value", 0, 0, false, false)
