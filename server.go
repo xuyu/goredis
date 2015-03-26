@@ -106,7 +106,7 @@ func (r *Redis) ConfigRewrite() error {
 // ConfigSet is used in order to reconfigure the server at run time without the need to restart Redis.
 // You can change both trivial parameters or switch from one to another persistence option using this command.
 func (r *Redis) ConfigSet(parameter, value string) error {
-	rp, err := r.ExecuteCommand("CONFIG", "SET")
+	rp, err := r.ExecuteCommand("CONFIG", "SET", parameter, value)
 	if err != nil {
 		return err
 	}
