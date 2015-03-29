@@ -424,6 +424,50 @@ type DialConfig struct {
 	MaxIdle  int
 }
 
+func newDialConfigFromURLString(rawurl string) (*DialConfig, error) {
+	ul, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+	scheme := DefaultNetwork
+	if ul.Scheme != "" {
+		scheme = ul.Scheme
+	}
+	host := DefaultAddress
+	if ul.Host != "" {
+		host = ul.Host
+	}
+	password := ""
+	if ul.User != nil {
+		if pw, set := ul.User.Password(); set {
+			password = pw
+		}
+	}
+	db := 0
+	path := strings.Trim(ul.Path, "/")
+	if path != "" {
+		db, err = strconv.Atoi(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	timeout := DefaultTimeout
+	if ul.Query().Get("timeout") != "" {
+		timeout, err = time.ParseDuration(ul.Query().Get("timeout"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	maxidle := DefaultMaxIdle
+	if ul.Query().Get("maxidle") != "" {
+		maxidle, err = strconv.Atoi(ul.Query().Get("maxidle"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &DialConfig{scheme, host, db, password, timeout, maxidle}, nil
+}
+
 // Dial new a redis client with DialConfig
 func Dial(cfg *DialConfig) (*Redis, error) {
 	if cfg == nil {
@@ -463,29 +507,11 @@ func Dial(cfg *DialConfig) (*Redis, error) {
 
 // DialURL new a redis client with URL-like argument
 func DialURL(rawurl string) (*Redis, error) {
-	ul, err := url.Parse(rawurl)
+	dialConfig, err := newDialConfigFromURLString(rawurl)
 	if err != nil {
 		return nil, err
 	}
-	password := ""
-	if ul.User != nil {
-		if pw, set := ul.User.Password(); set {
-			password = pw
-		}
-	}
-	db, err := strconv.Atoi(strings.Trim(ul.Path, "/"))
-	if err != nil {
-		return nil, err
-	}
-	timeout, err := time.ParseDuration(ul.Query().Get("timeout"))
-	if err != nil {
-		return nil, err
-	}
-	maxidle, err := strconv.Atoi(ul.Query().Get("maxidle"))
-	if err != nil {
-		return nil, err
-	}
-	return Dial(&DialConfig{ul.Scheme, ul.Host, db, password, timeout, maxidle})
+	return Dial(dialConfig)
 }
 
 // Reply Type: Status, Integer, Bulk, Multi Bulk
