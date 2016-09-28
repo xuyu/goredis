@@ -358,7 +358,7 @@ func (r *Redis) ExecuteCommand(args ...interface{}) (*Reply, error) {
 		rp, err = c.RecvReply()
 	}
 	if err == nil {
-		defer func() { r.pool.Put(c) }()
+		r.pool.Put(c)
 	}
 	return rp, err
 }
